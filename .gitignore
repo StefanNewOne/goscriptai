@@ -11,3 +11,6 @@ api/prisma/*.db
 uploads/
 exports/
 .vite/
+
+# local infra override (per-machine ports)
+docker-compose.override.yml
