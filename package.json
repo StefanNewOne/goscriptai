@@ -1,0 +1,27 @@
+{
+  "name": "goscriptai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GoScriptAI — agentic reel-script system with human checkpoints",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "dev:api": "npm run dev --workspace api",
+    "dev:web": "npm run dev --workspace web",
+    "prisma:migrate": "npm run prisma:migrate --workspace api",
+    "seed": "npm run seed --workspace api"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}

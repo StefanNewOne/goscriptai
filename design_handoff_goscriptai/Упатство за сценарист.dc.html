@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1B1F24}
+doc-page:not(:defined){visibility:hidden}
+a{color:#1B1F24}a:hover{color:#E4572E}
+</style>
+<script src="./doc-page.js"></script>
+</helmet>
+<doc-page margin="0.85in">
+  <div slot="footer" style="display:flex; justify-content:space-between; font-size:9pt; color:#5A6270; border-top:1px solid #D9DDE3; padding-top:6px;"><span>GoScriptAI · Упатство за сценарист v1.0</span><span>05.09.2026</span></div>
+
+  <h1 style="font-size:30pt; font-weight:600; line-height:1.15; margin:0 0 8px;">GoScriptAI — упатство за сценарист</h1>
+  <p style="font-size:12.5pt; color:#5A6270; margin:0 0 28px; max-width:34em;">Како работи системот, екран по екран. Напишано за Александар и Стефан: што гледаш, што кликаш, што се случува во позадина и каде оди резултатот.</p>
+
+  <div style="border:1px solid #D9DDE3; border-radius:10px; padding:16px 20px; margin-bottom:28px; break-inside:avoid;">
+    <div style="font-weight:600; margin-bottom:6px;">Целиот систем во шест реда</div>
+    <ol style="margin:0; padding-left:20px; font-size:11pt; line-height:1.6;">
+      <li>Клиентот има <b>Мозок</b>: профил, аватари, продукти, актери, локации, конкуренти, референци, речник.</li>
+      <li>Ти отвораш <b>сет</b> со кратко <b>бриф</b>.</li>
+      <li>Креативниот директор враќа <b>концепт-карти</b> — ти избираш. <i>Прв чекпоинт.</i></li>
+      <li>Писателите пишуваат паралелно, Критичарот оценува по 11 критериуми.</li>
+      <li>Ти <b>одобруваш</b>, доработуваш или враќаш со коментар. <i>Втор чекпоинт.</i></li>
+      <li>Одобрениот сет се <b>експортира</b> како документ; кодот на сценариото е името на рекламата.</li>
+    </ol>
+  </div>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">Правилото на бојата</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Портокалово значи едно: <b>чека тебе</b>. Ако екранот е речиси црно-бел, нема твоја одлука во ред. Зелено е одобрено или поминато, жолто е предупредување (буџет, не поминало критика), црвено е грешка. Ништо друго во системот не користи боја.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px; break-before:page;">1. Чека тебе — стартна страница</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Ова е првиот екран секое утро. Ги собира сите твои одлуки од сите клиенти и сите сетови на едно место, групирани по тип: концепти за избор, сценарија за одобрување, предлози за потврда, буџет.</p>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:14px;">
+    <thead><tr><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600; width:34%;">Што гледаш</th><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600;">Што значи</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Бројач во навигацијата</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Колку ставки чекаат тебе. Пулсира еднаш кога агент завршил нешто ново.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Ред во листата</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Лого на клиентот, сет, што чека, колку чека, кој сценарист. Клик те носи директно во екранот на одлуката — не во преглед.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">„Само мои“</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Ги крие ставките на другиот сценарист.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Празен екран</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">„Ништо не чека. Агентите работат на 3 сета.“ Тоа е добра вест, не грешка.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Никогаш не чекаш на екран. Ако пуштиш нешто и одиш на друга работа, ќе се појави тука кога ќе биде готово.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">2. Клиенти</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Еден ред по клиент, сортирано по чекање. Во редот: јазик, состојба на мозокот (комплетен или што недостасува), сетови овој месец наспроти договорот, покриеност на аватари и беџ „чека тебе“.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;"><b>Покриеност на аватари</b> се чита како мали линии: една група линии по аватар, темна линија значи таргетиран во тој сет, сива значи не. Аватар со четири сиви линии не е таргетиран 3+ сета — тоа е знак, не грешка, но треба свесна одлука.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">3. Клиент — Преглед</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Три блока. <b>Што е ново</b> го читаш прво: хронолошки, што се променило во мозокот и што вратиле резултатите од последниот сет. <b>Покриеност на аватари</b> ти кажува кого одбегнуваш. <b>Сетови</b> ги покажува тековните и последните.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Доминантното копче е „Нов сет“. Ако само сакаш да провериш нешто, влези во Мозок.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">4. Клиент — Мозок</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Тука живее сето знаење за клиентот. Ти го одржуваш; агентите го читаат при секое пишување.</p>
+  <ul style="font-size:11pt; line-height:1.65; margin:0 0 12px; padding-left:20px; max-width:34em;">
+    <li><b>Профил</b> — документ за читање. „Верзии и разлики“ покажува што се сменило од претходната верзија; „Ажурирај анализа“ пушта нова анализа со твоите нови документи и враќа предлог на чекпоинт.</li>
+    <li><b>Аватари</b> — по еден картон: кој е, болка, желба, зошто купува, приговори, како зборува. Аватар со статус „чека потврда“ е предлог од агент и не се користи додека не го потврдиш.</li>
+    <li><b>Продукти</b> — табела со инлајн уредување. Цените и ратите тука се она што Критичарот го проверува во сценариото (критериум Точност).</li>
+    <li><b>Актери</b> — фотографија, стил, што може и што не може, забрани. Ова е причината зошто Јуле не добива реплика со цени.</li>
+    <li><b>Локации</b> — што се гледа, што може да се искористи, ограничувања за снимање.</li>
+    <li><b>Конкуренти</b> — потврдени одделно од предлозите на агентот. Предлог се внесува во база само со твоја потврда.</li>
+    <li><b>Референци</b> — линк со ознака „Инспирација“ или „Не копирај“.</li>
+    <li><b>Речник</b> — претпочитани, забранети и имиња на производи по јазик. Оди во секој Писател како задолжителен влез.</li>
+    <li><b>Инсајти</b> — доаѓаат со резултатите од рекламите (Фаза 2).</li>
+  </ul>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Правило: ниту еден агент не запишува нов ентитет без твоја потврда. Предлозите чекаат во Инбокс.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px; break-before:page;">5. Нов сет — Бриф</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Еден екран, без чекори, три минути. Одгоре надолу:</p>
+  <ol style="font-size:11pt; line-height:1.65; margin:0 0 12px; padding-left:20px; max-width:34em;">
+    <li>Клиент, со собирлив блок „Што е ново од последниот сет“.</li>
+    <li>Број на сценарија (1–10). Креативниот директор секогаш враќа двојно повеќе карти.</li>
+    <li>Распределба по тип — чипови, или „Одлучи ти“ ако не ти е важно.</li>
+    <li>Продукт или понуда од листата, плус слободен текст ако понудата е специфична.</li>
+    <li>Аватари. Двата предложени носат ознака „предлог“ — избрани се според покриеност и инсајти.</li>
+    <li>Актери и локации достапни за <i>ова</i> снимање. Ова е најважниот филтер: Креативниот директор нема да предложи концепт со актер што го немаш тој ден.</li>
+    <li>Што кажа клиентот — слободен текст, може празно.</li>
+    <li>Инспирација (линк или транскрипт) со радио „преработи“ или „ова НЕ“. Влегува во мозокот како референца.</li>
+    <li>Ограничувања и целно времетраење.</li>
+  </ol>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">„Генерирај концепти“ го креира сетот и веднаш те ослободува. Сетот стои со статус „Се генерираат концепти“, а ти одиш на друга работа.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">6. Сет — Концепти (прв чекпоинт)</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Ова е екранот на избор. Секоја карта е компактна: тип, аватар, <b>hook во една реченица</b> (најголемиот текст — по него одлучуваш), инсајт, актер и локација, зошто треба да работи, проценка на времетраење.</p>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:14px;">
+    <thead><tr><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600; width:30%;">Копче</th><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600;">Што прави</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Избери</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Картата влегува во сетот; рамката потемнува и бројачот десно расте. Повторен клик ја враќа.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Отфрли</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Картата бледнее и останува во сетот како „не“ за следниот пат.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Коментар</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Кратка забелешка што оди со картата кон Писателот.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Смени аватар</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Го менува примарниот аватар на картата ако мислиш дека hook-от повеќе одговара на друг.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Уште 3 карти во оваа насока</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Активно кога имаш избрана карта; ја користи како референца во истата сесија.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Пиши ги избраните</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Единственото портокалово копче. Пушта по еден Писател на секоја избрана карта, паралелно.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Не мора да избереш точно колку што побара брифот. Бројачот ти кажува каде си; помалку или повеќе е во ред.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px; break-before:page;">7. Сет — Сценарија (втор чекпоинт)</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Ова е екранот каде поминуваш најмногу време. Три колони: листа на сценаријата во сетот, самото сценарио, и контекст.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;"><b>Сценариото</b> е сложено како вистинско сценарио за снимање: моноширинско писмо, во левата маргина улогата на кадарот (ХООК / БОДИ / ЦТА) и бројот, режијата во курзив, репликата со име на актер, редовите „Монтажа:“ издвоени, табела кога има набројување цени. Мета редот горе носи тип, аватар, актер, локација, времетраење и кодот.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;"><b>Критика</b> (десно) дава вкупен процент и 11 критериуми со оценка 1–5. Праг: сите критериуми ≥ 3 и вкупно ≥ 80%. Наодите на Критичарот се конкретни; „Скокни до кадар“ те носи точно на местото и го означува кратко. Ако сценариото не поминало по два круга ревизија, го добиваш со жолта ознака и наодите — сепак можеш да го одобриш.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;"><b>Контекст</b> (втор таб) ти покажува аватарот, актерот со неговите ограничувања, локацијата и продуктот во фокус — за да не листаш назад кон мозокот додека читаш.</p>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:14px;">
+    <thead><tr><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600; width:30%;">Копче</th><th style="text-align:left; padding:6px 8px; border-bottom:1px solid #1B1F24; font-weight:600;">Што прави</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Одобри</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Го заклучува сценариото за експорт и автоматски те носи на следното што чека. Toast: „Одобрено“.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Доработи рачно</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Текстот станува уредлив на место, со истата типографија. „Зачувај верзија“ создава нова верзија; старата останува во хронологијата.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Врати со коментар</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Пишуваш што да се смени; Писателот продолжува во истата сесија и сценариото се враќа во „Чека тебе“ со нова верзија.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Кога сите сценарија во сетот се одобрени, се појавува копчето „Кон експорт“.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">8. Сет — Експорт</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 12px; max-width:34em;">Прегледот покажува како ќе изгледа документот: страница по сценарио, со кодот крупно. „Копирај код“ го става во меморија — тоа е името што го внесуваш во Ads Manager, буква по буква исто. Десно е списокот актери и локации по сценарио, за продукција.</p>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">„Експортирај документ“ генерира docx и markdown. Сетот добива статус „Експортирано“, а линковите остануваат тука.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">9. Сет — Транскрипти и Трошок</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Транскриптите се за проверка, не за секојдневна работа: по агентски run, порака по порака, tool call-овите собирливи. Трошокот е табела по агент наспроти буџетот на сетот; на 80% добиваш предупредување, на 100% сетот застанува и чека твоја одлука.</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 4px;">10. Сценарија — база</h2>
+  <p style="font-size:11pt; line-height:1.6; margin:0 0 24px; max-width:34em;">Едно поле за пребарување: код, наслов, hook, или значење („хумор за рати“). Чиповите филтрираат по тип и по ѕвезда примери. Клик отвора сценариото во истиот преглед, само за читање. Означувањето „ѕвезда пример“ е важно: тие сценарија одат како примери во секој нов Писател додека не дојдат вистинските резултати.</p>
+
+  <div style="border:1px solid #D9DDE3; border-radius:10px; padding:16px 20px; break-inside:avoid;">
+    <div style="font-weight:600; margin-bottom:6px;">Што сè уште не е во системот</div>
+    <p style="font-size:11pt; line-height:1.6; margin:0;">Резултати од Meta реклами, инсајти по клиент и индустрија, и мапирањето реклама → сценарио доаѓаат во Фаза 2. Увоз, Извештаи и Поставки постојат во навигацијата, но во овој прототип се празни. Мобилната верзија (одобрување со палец) е следна.</p>
+  </div>
+</doc-page>
+</x-dc>
+</body>
+</html>

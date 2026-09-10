@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans text-14;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Reading document width for the profile / script (Design Brief §4.3). */
+  a {
+    color: inherit;
+  }
+}
+
+/* prefers-reduced-motion disables all animation (README §Motion). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

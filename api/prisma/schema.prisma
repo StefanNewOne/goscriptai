@@ -1,0 +1,513 @@
+// GoScriptAI — Prisma schema. Source of truth: PRD §15.
+// Money as Decimal (never float); times UTC. pgvector for semantic search.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ── Enums ───────────────────────────────────────────────────────────
+enum Language {
+  MK
+  SQ
+  BOTH
+}
+
+enum Role {
+  SCRIPTWRITER
+  ADMIN
+  VIEWER
+}
+
+enum ClientStatus {
+  DRAFT
+  INTAKE
+  ANALYST_RUNNING
+  ANALYST_QUESTIONS
+  ANALYST_REVIEW
+  AVATARS_RUNNING
+  AVATARS_REVIEW
+  MANUAL_SETUP
+  ACTIVE
+}
+
+enum SetStatus {
+  DRAFT
+  BRIEF_SUBMITTED
+  CONCEPTS_GENERATING
+  CONCEPTS_REVIEW
+  SCRIPTS_WRITING
+  CRITIC_RUNNING
+  AUTO_REVISION
+  SCRIPTS_REVIEW
+  REVISION
+  APPROVED
+  EXPORTED
+  // Phase 2 (model exists, runtime not built)
+  LINKED_TO_ADS
+  LEARNED
+  ARCHIVED
+  // Special (from anywhere)
+  PAUSED
+  FAILED
+  BUDGET_HOLD
+}
+
+enum ScriptType {
+  PRODUCT_OFFER
+  EDUCATIONAL
+  TESTIMONIAL
+  SKETCH
+}
+
+enum ScriptStatus {
+  DRAFT
+  WRITING
+  CRITIC_RUNNING
+  CRITIC_FAILED
+  SCRIPTS_REVIEW
+  APPROVED
+  EXPORTED
+  LIVE // Ф2
+  LEARNED // Ф2
+}
+
+enum AvatarStatus {
+  PENDING_CONFIRMATION
+  ACTIVE
+  RETIRED
+}
+
+enum ConceptDecision {
+  PENDING
+  SELECTED
+  REJECTED
+}
+
+// ── Users ───────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  passwordHash String
+  role      Role     @default(SCRIPTWRITER)
+  notifyEmail    Boolean @default(true)
+  notifyTelegram Boolean @default(false)
+  telegramChatId String?
+  sets      ScriptSet[]
+  approvals Approval[]
+  createdAt DateTime @default(now())
+}
+
+// ── Client Brain ────────────────────────────────────────────────────
+model Client {
+  id               String        @id @default(cuid())
+  name             String
+  code             String        @unique
+  industry         String?
+  language         Language      @default(MK)
+  status           ClientStatus  @default(DRAFT)
+  logoUrl          String?
+  websiteUrl       String?
+  reelsPerMonth    Int?
+  graphicsPerMonth Int?
+  metaAdAccountIds String[]      @default([])
+  budgetUsd        Decimal       @default(50) @db.Decimal(10, 2)
+  spentUsd         Decimal       @default(0) @db.Decimal(10, 2)
+
+  profiles    ClientProfile[]
+  avatars     Avatar[]
+  products    Product[]
+  actors      Actor[]
+  locations   Location[]
+  competitors Competitor[]
+  references  TrendReference[]
+  glossary    GlossaryTerm[]
+  sets        ScriptSet[]
+  scripts     Script[]
+  insights    Insight[]
+  changeLog   BrainChange[]
+  agentRuns   AgentRun[]
+  approvals   Approval[]
+  costEntries CostEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model ClientProfile {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  version   Int
+  markdown  String
+  data      Json // industry, products, USP, tone, presence, campaigns, open questions
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([clientId, version])
+  @@index([clientId])
+}
+
+model Avatar {
+  id         String       @id @default(cuid())
+  clientId   String
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name       String
+  version    Int          @default(1)
+  profile    Json // demographics, situation, pain, desire, why-buy, objections, speech
+  productIds String[]     @default([])
+  status     AvatarStatus @default(PENDING_CONFIRMATION)
+  scripts    Script[]
+  concepts   Concept[]
+  createdAt  DateTime     @default(now())
+
+  @@index([clientId, status])
+}
+
+model Actor {
+  id        String     @id @default(cuid())
+  clientId  String? // null = GoDigital talent, available to all clients
+  client    Client?    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  role      String // owner | employee | hired | godigital_talent
+  languages Language[] @default([])
+  style     String?
+  canDo     String[]   @default([])
+  cannotDo  String[]   @default([])
+  notes     String?
+  photoUrl  String?
+  concepts  Concept[]
+
+  @@index([clientId])
+}
+
+model Location {
+  id             String   @id @default(cuid())
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name           String
+  description    String
+  usableElements String[] @default([])
+  constraints    String?
+  images         String[] @default([])
+  concepts       Concept[]
+
+  @@index([clientId])
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  category    String?
+  price       Decimal?  @db.Decimal(10, 2)
+  installment Decimal?  @db.Decimal(10, 2)
+  usp         String?
+  seasonality String?
+  promoFrom   DateTime?
+  promoTo     DateTime?
+  active      Boolean   @default(true)
+
+  @@index([clientId])
+}
+
+model Competitor {
+  id       String  @id @default(cuid())
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name     String
+  links    Json // { website, ig, fb, tiktok }
+  why      String?
+  doNotCopy String?
+  status   String  @default("PENDING_CONFIRMATION") // PENDING_CONFIRMATION | CONFIRMED
+  profiles Json?
+
+  @@index([clientId, status])
+}
+
+model TrendReference {
+  id         String                        @id @default(cuid())
+  clientId   String?
+  client     Client?                       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  url        String?
+  platform   String?
+  transcript String?
+  analysis   String?
+  flag       String // INSPIRATION | DO_NOT_COPY
+  source     String // link | whisper | paste
+  embedding  Unsupported("vector(1536)")?
+  createdAt  DateTime                      @default(now())
+
+  @@index([clientId])
+}
+
+model GlossaryTerm {
+  id       String   @id @default(cuid())
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  language Language
+  term     String
+  meaning  String
+  kind     String // PREFERRED | BANNED | PRODUCT_NAME
+
+  @@index([clientId, language])
+}
+
+model Insight {
+  id        String   @id @default(cuid())
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  industry  String?
+  text      String
+  evidence  Json
+  weight    Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model BrainChange {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  kind      String
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([clientId, createdAt])
+}
+
+// ── Set flow ────────────────────────────────────────────────────────
+model ScriptSet {
+  id           String     @id @default(cuid())
+  clientId     String
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  writerUserId String
+  writer       User       @relation(fields: [writerUserId], references: [id])
+  status       SetStatus  @default(DRAFT)
+  yymm         String // e.g. "2609" — for code generation
+  brief        Json // §9.2 fields
+  requested    Int        @default(1)
+  budgetUsd    Decimal    @default(8) @db.Decimal(10, 2)
+  spentUsd     Decimal    @default(0) @db.Decimal(10, 2)
+  prevStatus   SetStatus?
+  exportPath   String?
+  exportMdPath String?
+
+  concepts  Concept[]
+  scripts   Script[]
+  agentRuns AgentRun[]
+  approvals Approval[]
+  costEntries CostEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId, status])
+  @@index([writerUserId, status])
+}
+
+model Concept {
+  id         String          @id @default(cuid())
+  setId      String
+  set        ScriptSet       @relation(fields: [setId], references: [id], onDelete: Cascade)
+  type       ScriptType
+  avatarId   String?
+  avatar     Avatar?         @relation(fields: [avatarId], references: [id])
+  actorId    String?
+  actor      Actor?          @relation(fields: [actorId], references: [id])
+  locationId String?
+  location   Location?       @relation(fields: [locationId], references: [id])
+  card       Json // hook, insight, why, layers, estimate
+  decision   ConceptDecision @default(PENDING)
+  comment    String?
+  scripts    Script[]
+  createdAt  DateTime        @default(now())
+
+  @@index([setId])
+}
+
+model Script {
+  id            String                        @id @default(cuid())
+  clientId      String
+  client        Client                        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  setId         String?
+  set           ScriptSet?                    @relation(fields: [setId], references: [id])
+  conceptId     String?
+  concept       Concept?                      @relation(fields: [conceptId], references: [id])
+  code          String                        @unique
+  title         String
+  type          ScriptType
+  language      Language
+  avatarId      String?
+  avatar        Avatar?                       @relation(fields: [avatarId], references: [id])
+  actorIds      String[]                      @default([])
+  locationId    String?
+  productIds    String[]                      @default([])
+  version       Int                           @default(1)
+  content       Json // frames: { role, direction, lines[], editing?, table? }
+  markdown      String
+  status        ScriptStatus                  @default(DRAFT)
+  criticReport  Json?
+  revisionRound Int                           @default(0)
+  isStarExample Boolean                       @default(false)
+  source        String                        @default("GENERATED") // GENERATED | IMPORTED
+  embedding     Unsupported("vector(1536)")?
+  adCreatives   AdCreative[]
+  versions      ScriptVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId, type, status])
+  @@index([setId])
+}
+
+model ScriptVersion {
+  id        String   @id @default(cuid())
+  scriptId  String
+  script    Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  version   Int
+  content   Json
+  markdown  String
+  authoredBy String // "writer" | "critic-revision" | userId
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([scriptId, version])
+}
+
+// ── Ads (Phase 2) ───────────────────────────────────────────────────
+model AdCreative {
+  id            String      @id @default(cuid())
+  scriptId      String?
+  script        Script?     @relation(fields: [scriptId], references: [id])
+  metaAdId      String      @unique
+  adAccountId   String
+  adName        String
+  objective     String
+  mappingStatus String      @default("PENDING_MAPPING")
+  metrics       AdMetrics[]
+}
+
+model AdMetrics {
+  id            String     @id @default(cuid())
+  adCreativeId  String
+  adCreative    AdCreative @relation(fields: [adCreativeId], references: [id], onDelete: Cascade)
+  date          DateTime
+  impressions   Int        @default(0)
+  spend         Decimal    @default(0) @db.Decimal(10, 2)
+  results       Int        @default(0)
+  costPerResult Decimal?   @db.Decimal(10, 4)
+  hookRate      Decimal?   @db.Decimal(6, 4)
+  holdRate      Decimal?   @db.Decimal(6, 4)
+  ctr           Decimal?   @db.Decimal(6, 4)
+  percentile    Int?
+
+  @@index([adCreativeId, date])
+}
+
+// ── Agents / runs / cost ────────────────────────────────────────────
+model AgentRun {
+  id        String    @id @default(cuid())
+  setId     String?
+  set       ScriptSet? @relation(fields: [setId], references: [id])
+  clientId  String
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  agentKind String
+  model     String
+  sessionId String?
+  costUsd   Decimal   @default(0) @db.Decimal(10, 4)
+  status    String    @default("RUNNING") // RUNNING | DONE | FAILED | PAUSED
+  attempt   Int       @default(0)
+  error     String?
+  messages  Message[]
+  createdAt DateTime  @default(now())
+
+  @@index([setId])
+  @@index([clientId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  runId     String
+  run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  role      String // system | assistant | user | tool_use | tool_result
+  content   Json
+  createdAt DateTime @default(now())
+
+  @@index([runId, createdAt])
+}
+
+model Approval {
+  id         String    @id @default(cuid())
+  setId      String?
+  set        ScriptSet? @relation(fields: [setId], references: [id])
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  checkpoint String
+  decision   String // approve | request_changes
+  comment    String?
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  createdAt  DateTime  @default(now())
+
+  @@index([setId])
+  @@index([clientId])
+}
+
+model CostEntry {
+  id        String    @id @default(cuid())
+  clientId  String
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  setId     String?
+  set       ScriptSet? @relation(fields: [setId], references: [id])
+  agentKind String
+  model     String?
+  usd       Decimal   @db.Decimal(10, 4)
+  createdAt DateTime  @default(now())
+
+  @@index([clientId, setId])
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  kind      String // creative_director | writer | critic | client_analyst | avatar_builder
+  language  Language?
+  version   Int
+  content   String
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([kind, language, version])
+  @@index([kind, active])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String?
+  channel   String // email | telegram
+  event     String
+  payload   Json
+  link      String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1B1F24}
+doc-page:not(:defined){visibility:hidden}
+a{color:#1B1F24}a:hover{color:#E4572E}
+code{font-family:'IBM Plex Mono',monospace;font-size:.92em}
+</style>
+<script src="./doc-page.js"></script>
+</helmet>
+<doc-page margin="0.85in">
+  <div slot="footer" style="display:flex; justify-content:space-between; font-size:9pt; color:#5A6270; border-top:1px solid #D9DDE3; padding-top:6px;"><span>GoScriptAI · Техничка документација по екран v1.0</span><span>05.09.2026</span></div>
+
+  <h1 style="font-size:30pt; font-weight:600; line-height:1.15; margin:0 0 8px;">GoScriptAI — техничка документација</h1>
+  <p style="font-size:12.5pt; color:#5A6270; margin:0 0 28px; max-width:34em;">По екран: рута, состојби, податоци, API повици, задолжени агенти, транзиции, крајни случаи и критериуми за прифаќање. Референци: PRD v1.0 (§7 агенти, §9 сет flow, §15 модел) и Design Brief v1.0 (§7 екрани, §8 компоненти).</p>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:0 0 8px;">Заедничка основа</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:14px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:30%; color:#5A6270;">Frontend</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">React + Vite + Tailwind (SPA), јазик на UI: македонска кирилица; код и имена на компоненти на англиски.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Backend</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Node 22 + TypeScript + Fastify; Postgres 16 + Prisma; pgvector за семантичко пребарување.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Агенти</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">BullMQ job-ови; никогаш синхроно со HTTP. Живи статуси преку SSE <code>/api/streams/set/:id</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Автентикација</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">JWT; улоги <code>SCRIPTWRITER</code> / <code>ADMIN</code> / <code>VIEWER</code>. Viewer нема пристап до чекпоинт мутации.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Дизајн токени</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>paper #F5F6F4</code> · <code>sheet #FFF</code> · <code>ink #1B1F24</code> · <code>ink-2 #5A6270</code> · <code>rule #D9DDE3</code> · <code>signal #E4572E</code> · <code>ok #2F7D4F</code> · <code>hold #B7791F</code> · <code>fail #9B2C2C</code>. <code>signal</code> само на човечка одлука.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Типографија</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">IBM Plex Sans 400/500/600 за UI; IBM Plex Mono за сценарија и кодови. Скала 13/14/16/20/28.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Заеднички компоненти</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>StatusBadge</code>, <code>CheckpointBar</code>, <code>ScriptView</code>/<code>ScriptEditor</code>, <code>ConceptCard</code>, <code>PersonCard</code>, <code>PlaceCard</code>, <code>AvatarCard</code>, <code>CriticScore</code>, <code>WhatsNewList</code>, <code>DiffView</code>, <code>AgentStatusLine</code>, <code>TranscriptViewer</code>, <code>ContextSheet</code>, <code>EmptyState</code>, <code>ErrorState</code>, <code>Toast</code>, <code>ConfirmDialog</code>, <code>DataTable</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px; break-before:page;">7.1 Чека тебе (Inbox)</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/</code> (стартна)</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>GET /api/inbox?mine=bool</code> → групи: <code>CONCEPTS_REVIEW</code>, <code>SCRIPTS_REVIEW</code>, <code>PENDING_CONFIRMATION</code>, <code>PENDING_MAPPING</code>, <code>BUDGET</code>. Извор: <code>ScriptSet.status</code>, <code>Script.status</code>, ентитети во <code>PENDING_CONFIRMATION</code>, <code>CostEntry</code> агрегат.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Ред</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>{clientId, clientName, logoUrl, setCode, kind, waitingSince, writerUserId, deepLink}</code>. Сортирање по <code>waitingSince</code> опаѓајќи.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Живо</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">SSE <code>/api/streams/inbox</code>; на нова ставка бројачот пулсира еднаш (<code>prefers-reduced-motion</code> го исклучува).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Состојби</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">празно (со број активни сетови), со ставки, филтрирано празно, грешка при вчитување.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Крајни случаи</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Ставка решена од другиот сценарист додека гледаш → редот се отстранува со toast. Клиент без лого → монограм.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Прифаќање</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Клик на ред отвора точниот екран на одлуката, не преглед. Ниту една ставка не бара пребарување за да се разбере.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.2 Клиенти</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/clients</code> · <code>GET /api/clients?sort=waiting</code></td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Пресметки</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>brainCompleteness</code> (недостасува актер / локација / речник по јазик), <code>setsThisMonth</code> наспроти <code>reelsPerMonth</code>, <code>avatarCoverage[avatarId][lastNSets]</code> (bool), <code>waitingCount</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Состојби</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">нема клиенти (покана „Нов клиент“), клиент во onboarding (без сетови), архивиран клиент.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Прифаќање</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Покриеноста се чита без легенда; долго име на клиент не крши редот.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.3 Клиент — Onboarding</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/clients/new</code> · <code>POST /api/clients</code>, <code>POST /api/clients/:id/intake</code> (multipart upload), <code>POST /api/clients/:id/analyst/run</code>, <code>POST /api/clients/:id/analyst/answers</code>, <code>POST /api/clients/:id/profile/:v/approve</code></td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">State machine</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>DRAFT → INTAKE → ANALYST_RUNNING → ANALYST_QUESTIONS* → ANALYST_REVIEW* → AVATARS_RUNNING → AVATARS_REVIEW* → MANUAL_SETUP* → ACTIVE</code> (<code>*</code> = човечки чекпоинт). <code>ACTIVE</code> е возможен со минимум еден актер.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Агенти</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Client Analyst (WebFetch, WebSearch, Read) → прашања + <code>ClientProfile</code>; Avatar Builder → 4–8 <code>Avatar</code> во <code>PENDING_CONFIRMATION</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Состојби</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">анализа во тек (статус линија, без спинер), прашања (текст / избор / „не знам“, со прогрес), профил на преглед (Одобри / Врати со коментар), одобрено, <code>BUDGET_HOLD</code>, <code>FAILED</code> по 3 retry.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.4 Клиент — Преглед</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/clients/:id</code> · <code>GET /api/clients/:id/overview</code> → <code>{changeLog[], avatarCoverage[], sets[], budget}</code></td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Модел</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>BrainChange{kind, summary, createdAt}</code> го полни „Што е ново“; се создава при секоја промена во мозокот и при враќање резултат.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Прифаќање</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">„Што е ново“ е првото што се чита; „Нов сет“ е единственото доминантно копче.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px; break-before:page;">7.5 Клиент — Мозок</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/clients/:id/brain/:tab</code>, tab ∈ profile · avatars · products · actors · locations · competitors · references · glossary · insights</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">CRUD по ентитет: <code>/api/clients/:id/{products|actors|locations|competitors|references|glossary}</code>; <code>GET /api/clients/:id/profile?version=</code> + <code>GET …/diff?from=&to=</code>; <code>POST /api/entities/:id/confirm|reject</code> за <code>PENDING_CONFIRMATION</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Компоненти</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Профил: документ 68 знаци + <code>DiffView</code>. Аватари: <code>AvatarCard</code> со линија на покриеност и верзии. Продукти: <code>DataTable</code> со инлајн уредување (optimistic update, rollback при 4xx). Актери/Локации: <code>PersonCard</code>/<code>PlaceCard</code>. Конкуренти: потврдени + одделна секција предлози.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Инварианта</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Ниту еден агент не запишува ентитет надвор од <code>PENDING_CONFIRMATION</code>. Речникот и јазикот на клиентот се задолжителен влез во секој агент што пишува текст.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Крајни случаи</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Продукт со промоција во минато → неактивен, но останува за историски сценарија. Аватар <code>RETIRED</code> не се предлага во бриф. Клиент <code>BOTH</code> јазик → речник и забранети фрази по јазик, одделно.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.6 Нов сет — Бриф</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/sets/new?client=</code> · <code>POST /api/sets</code> со <code>brief</code> JSON (PRD §9.2) → <code>201 {setId}</code>, потоа <code>enqueue CreativeDirectorJob</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Влезни полиња</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>{clientId, requested:1..10, typeMix[], productIds[], offerText, avatarIds[], actorIds[], locationIds[], notes, inspiration:{url|transcript, flag:INSPIRATION|DO_NOT_COPY}, constraints, targetSec}</code></td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Валидација</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Задолжително: клиент <code>ACTIVE</code>, ≥1 актер, ≥1 аватар. Актер без јазикот на сетот се отфрла со објаснување. Инспирацијата се создава како <code>TrendReference</code> пред пуштањето.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Предлози</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Два аватари се предизбрани по правилото: најдолго непокриени, потоа по тежина на инсајт (Ф2).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Транзиција</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>DRAFT → BRIEF_SUBMITTED → CONCEPTS_GENERATING</code>. UI не блокира; корисникот е ослободен веднаш.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.7 Сет — Концепти (чекпоинт 1)</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/sets/:id/concepts</code> · <code>GET /api/sets/:id/concepts</code>; <code>PATCH /api/concepts/:id {decision, comment, avatarId, type}</code>; <code>POST /api/sets/:id/concepts/more {referenceConceptId}</code>; <code>POST /api/sets/:id/write</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Агент</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Creative Director: N×2 карти од бриф + Client Brain + инсајти + „ова НЕ“. „Уште 3“ работи во истата сесија (<code>sessionId</code> од <code>AgentRun</code>).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Карта</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>Concept.card = {hook, insight, why, layers[], estimateSec, complexity}</code> + <code>type</code>, <code>avatarId</code>, <code>actorId</code>, <code>locationId</code>, <code>decision ∈ PENDING|SELECTED|REJECTED</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Транзиција</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>CONCEPTS_REVIEW → SCRIPTS_WRITING</code>: по еден Writer job на секој <code>SELECTED</code> концепт, паралелно. Отфрлените остануваат како негативен сигнал за следниот бриф.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Состојби</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">се генерираат (прогрес линија), спремни за избор, избрани (read-only резиме за стари сетови), 0 избрани (копчето „Пиши“ е неактивно), <code>BUDGET_HOLD</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px; break-before:page;">7.8 Сет — Сценарија (чекпоинт 2, херој екран)</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/sets/:id/scripts/:scriptId</code> · <code>GET /api/scripts/:id</code>; <code>POST /api/scripts/:id/approve</code>; <code>PUT /api/scripts/:id/content</code> (рачна доработка, создава нова <code>version</code>); <code>POST /api/scripts/:id/revise {comment}</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Формат</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>Script.content = {frames:[{n, role:ХООК|БОДИ|ЦТА, sub?, direction, lines:[{actor,text}], editing?, table?{head[],rows[][]}}]}</code>. Нормализиран за генерирани и увезени сценарија (PRD §11).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">ScriptView</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Mono 16px / line-height 1.7 / max 68 знаци; улога и број на кадар во левата маргина; режија курзив <code>ink-2</code>; име на актер 600; „Монтажа:“ издвоен ред; табела за бројки на екран. <code>ScriptEditor</code> е истиот изглед со <code>contentEditable</code> по поле — зачувувањето чита назад по <code>data-e</code> клуч и создава нова верзија.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Критика</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>criticReport = {scores:{criterion:1..5}, findings:[{frame, text}], total}</code>. Праг: сите ≥ 3 и вкупно ≥ 80%. Под праг → назад кај Writer, max 2 круга, потоа <code>CRITIC_FAILED</code> со наоди. „Скокни до кадар“ = anchor <code>#frame-N</code> + краткотрајно означување.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Транзиции</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>SCRIPTS_WRITING → CRITIC_RUNNING → (AUTO_REVISION ≤2) → SCRIPTS_REVIEW ↔ REVISION → APPROVED</code>. Секое одобрување пишува <code>Approval{checkpoint:'SCRIPTS', decision, comment, userId}</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Состојби</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">се пишува · во критика · се доработува · чека тебе · не помина критика · одобрено · експортирано. Паралелен пад на еден Writer не го руши сетот.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Распоред</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Листа 200–230px · сценарио <code>1fr</code> (min 460px) · <code>ContextSheet</code> 280–320px, собирлив. Под ~1000px колоните се прекршуваат вертикално; на мобилен контекстот е долен sheet и акциите се лепливи (48px).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Прифаќање</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Сценаристот чита сценариото како на хартија и одобрува со едно копче; наодите водат до точниот кадар; ниту една акција не бара објаснување.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.9 Сет — Експорт</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/sets/:id/export</code> · <code>POST /api/sets/:id/export</code> → <code>{docxUrl, mdUrl}</code>, статус <code>EXPORTED</code>, <code>ScriptSet.exportPath</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Код</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>{CLIENT_CODE}-{YYMM}-{NN}</code>, unique; <b>идентичен со името на рекламата во Ads Manager</b> — единствено правило за мапирање (Ф2). „Копирај код“ користи clipboard API со fallback.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Документ</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Наслов „{Клиент} {Месец} Сценарија“; страница по сценарио во форматот од PRD §11; список актери и локации по сценарио.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Услов</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Достапен само кога сите сценарија во сетот се <code>APPROVED</code>; инаку блокирана состојба со бројач одобрени.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.10 Сет — Транскрипти и Трошок</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>GET /api/sets/:id/runs</code>, <code>GET /api/runs/:id/messages</code>, SSE <code>/api/streams/run/:id</code>; <code>GET /api/sets/:id/cost</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Модел</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>AgentRun{agentKind, model, sessionId, costUsd, status}</code> + <code>Message{role, content}</code>; <code>CostEntry</code> по клиент и сет.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Буџет</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Default $8 по сет, $50 по клиент месечно; 80% → предупредување и нотификација, 100% → <code>BUDGET_HOLD</code> и чекпоинт.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">UI</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Густ, монохромен <code>TranscriptViewer</code>; tool call-ови собирливи; имињата на моделите се дозволени само тука и во Поставки.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px; break-before:page;">7.11 База на сценарија</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Рута / API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>/scripts</code> · <code>GET /api/scripts?q=&client=&type=&avatar=&actor=&status=&lang=&star=</code>. Едно поле: точно совпаѓање по код/наслов, плус pgvector семантичко пребарување по <code>markdown</code> embedding — без посебен „AI search“ UI.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Акција</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>POST /api/scripts/:id/star</code> — ѕвезда примерите се few-shot влез за Writer додека нема метрики (PRD §9.4).</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Преглед</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Истиот <code>ScriptView</code>, read-only.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.12 Увоз</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">API</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>POST /api/import/parse</code> (docx / paste / повеќе фајлови) → нормализирани кадри + предупредувања; <code>POST /api/import/commit</code> со <code>{clientId, code, type, avatarId, actorIds, adDate}</code>.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">UI</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Парсираниот резултат во <code>ScriptView</code> до оригиналот; предупредувања како „не најдов ЦТА“; состојби: парсирање, парсирано со предупредувања, зачувано.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Крајни случаи</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Дупликат код → предлог следен слободен <code>NN</code>. Сценарио без улоги на кадри → рачно доделување пред запис.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.13 Резултати (Фаза 2)</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:10px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Извор</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Дневен Meta Marketing API sync; <code>AdCreative</code> + <code>AdMetrics</code>; мапирање по име на реклама == код. Без совпаѓање → <code>PENDING_MAPPING</code> во Inbox.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Метрики</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">По објектив (<code>THRUPLAY</code>, <code>MESSAGES</code>, <code>ADD_TO_CART</code>, <code>PURCHASE</code>) плус impressions, spend, hook rate, hold rate, CTR; перцентил наспроти медијаната на истиот клиент за 90 дена.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">UI правило</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Само хоризонтални ленти и една временска линија. Без пити и без графикони заради графикони.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:17pt; font-weight:600; margin:24px 0 6px;">7.14 Извештаи и Поставки</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:10.5pt; margin-bottom:14px;">
+    <tbody>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; width:26%; color:#5A6270;">Извештаи</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">По сет, по клиент, месечно; трошок наспроти Max кредит; сетови по сценарист; PDF експорт.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Поставки (Admin)</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;"><code>Template</code> по агент со верзии (текст едитор + историја), рубрика на Критичарот, забранети фрази по јазик, формат на сценарио, модел-рутирање и fallback, буџети, Meta token (маскиран), нотификации по корисник, корисници и улоги.</td></tr>
+      <tr><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; color:#5A6270;">Fallback</td><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3;">Max претплата недостапна → автоматски switch на API клуч за тековниот run + нотификација; трошокот се означува одделно.</td></tr>
+    </tbody>
+  </table>
+
+  <div style="border:1px solid #D9DDE3; border-radius:10px; padding:16px 20px; break-inside:avoid;">
+    <div style="font-weight:600; margin-bottom:6px;">Квалитетно дно (важи за секој екран)</div>
+    <p style="font-size:11pt; line-height:1.6; margin:0;">Респонзивно до 360px; видлив keyboard focus; контраст AA вклучувајќи <code>ink-2</code> на <code>sheet</code>; <code>prefers-reduced-motion</code> целосно почитуван; секоја икона со текст или aria-label на македонски; кирилицата тестирана со Ѓ Ќ Ѕ Џ Љ Њ и Ç Ë во сите тежини; долги имиња на производи и реплики не кршат распоред; сите транзиции на состојба се транскациски — ниту еден сет не останува недефиниран.</p>
+  </div>
+</doc-page>
+</x-dc>
+</body>
+</html>

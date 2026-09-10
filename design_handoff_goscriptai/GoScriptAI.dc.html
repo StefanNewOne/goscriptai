@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#F5F6F4;color:#1B1F24;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#1B1F24}a:hover{color:#E4572E}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit;font-size:14px;color:#1B1F24}
+input:focus-visible,textarea:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid #1B1F24;outline-offset:2px}
+@keyframes gs-pulse{0%{box-shadow:0 0 0 0 rgba(228,87,46,.55)}100%{box-shadow:0 0 0 10px rgba(228,87,46,0)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; background:#F5F6F4;">
+  <!-- Лева навигација -->
+  <nav aria-label="Главна навигација" style="width:240px; flex:none; border-right:1px solid #D9DDE3; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; background:#F5F6F4;">
+    <div style="height:56px; display:flex; align-items:center; padding:0 20px; gap:10px; border-bottom:1px solid #D9DDE3;">
+      <div style="width:22px; height:22px; border:2px solid #1B1F24; border-radius:4px; display:grid; place-items:center;"><div style="width:8px; height:8px; background:#1B1F24; border-radius:1px;"></div></div>
+      <div style="font-weight:600; font-size:15px;">GoScriptAI</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:2px; padding:12px 12px;">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="7">
+        <button onClick="{{ n.go }}" aria-current="{{ n.current }}" style="display:flex; align-items:center; gap:10px; height:38px; padding:0 10px; border:0; border-radius:6px; background:{{ n.bg }}; color:#1B1F24; font-size:14px; font-weight:{{ n.weight }}; text-align:left; width:100%;" style-hover="background:#ECEEEB;">
+          <span aria-hidden="true" style="width:16px; height:16px; border:1.5px solid #5A6270; border-radius:{{ n.iconRadius }}; flex:none;"></span>
+          <span style="flex:1;">{{ n.label }}</span>
+          <sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="min-width:22px; height:20px; padding:0 6px; border-radius:10px; background:#E4572E; color:#fff; font-size:12px; font-weight:600; display:grid; place-items:center; animation: {{ pulseAnim }};">{{ n.badge }}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </div>
+    <div style="margin-top:auto; padding:16px 20px; border-top:1px solid #D9DDE3; display:flex; align-items:center; gap:10px;">
+      <div style="width:32px; height:32px; border-radius:50%; background:#1B1F24; color:#fff; display:grid; place-items:center; font-weight:600; font-size:13px;">А</div>
+      <div style="line-height:1.3;"><div style="font-weight:500;">Александар</div><div style="color:#5A6270; font-size:13px;">Сценарист</div></div>
+    </div>
+  </nav>
+
+  <!-- Главна површина -->
+  <main style="flex:1; min-width:0; display:flex; flex-direction:column;">
+    <header style="height:56px; display:flex; align-items:center; gap:12px; padding:0 24px; border-bottom:1px solid #D9DDE3; background:#F5F6F4; position:sticky; top:0; z-index:5;">
+      <div style="flex:1; max-width:520px; position:relative;">
+        <input type="search" value="{{ search }}" onChange="{{ setSearch }}" placeholder="Пребарај клиент, код или текст на сценарио" aria-label="Пребарување" style="width:100%; height:36px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">
+        <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:40px; left:0; right:0; background:#fff; border:1px solid #D9DDE3; border-radius:10px; box-shadow:0 8px 24px rgba(27,31,36,.12); padding:6px; z-index:20;">
+            <sc-for list="{{ searchResults }}" as="r" hint-placeholder-count="0">
+              <button onClick="{{ r.go }}" style="display:flex; gap:12px; align-items:center; width:100%; text-align:left; padding:8px 10px; border:0; background:transparent; border-radius:6px;" style-hover="background:#F5F6F4;">
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#5A6270; min-width:120px;">{{ r.code }}</span>
+                <span style="flex:1;">{{ r.title }}</span>
+                <span style="color:#5A6270; font-size:13px;">{{ r.client }}</span>
+              </button>
+            </sc-for>
+            <sc-if value="{{ searchEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:10px; color:#5A6270;">Нема резултати за „{{ search }}“.</div></sc-if>
+          </div>
+        </sc-if>
+      </div>
+      <div style="flex:1;"></div>
+      <button onClick="{{ goBrief }}" style="height:36px; padding:0 14px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500;" style-hover="background:#2b3038;">Нов сет</button>
+    </header>
+
+    <div style="padding:24px; max-width:1280px; width:100%;">
+
+    <!-- 7.1 ЧЕКА ТЕБЕ -->
+    <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:20px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Чека тебе</h1>
+        <div style="color:#5A6270;">{{ inboxSummary }}</div>
+        <div style="flex:1;"></div>
+        <label style="display:flex; align-items:center; gap:8px; color:#5A6270; cursor:pointer;"><input type="checkbox" checked="{{ onlyMine }}" onChange="{{ toggleOnlyMine }}"> Само мои</label>
+      </div>
+      <sc-if value="{{ inboxEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px 24px; max-width:560px;">
+          <div style="font-size:16px; margin-bottom:12px;">Ништо не чека. Агентите работат на {{ activeSetsCount }} сета.</div>
+          <button onClick="{{ goClients }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Отвори клиенти</button>
+        </div>
+      </sc-if>
+      <div style="display:flex; flex-direction:column; gap:24px;">
+        <sc-for list="{{ inboxGroups }}" as="g" hint-placeholder-count="2">
+          <section>
+            <div style="font-weight:500; margin-bottom:8px; display:flex; gap:8px; align-items:baseline;"><span>{{ g.title }}</span><span style="color:#5A6270; font-size:13px;">{{ g.count }}</span></div>
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <button onClick="{{ it.go }}" style="display:grid; grid-template-columns:36px 1fr 1.4fr 100px 110px; align-items:center; gap:16px; width:100%; min-height:52px; padding:8px 16px; border:0; border-top:1px solid #D9DDE3; margin-top:-1px; background:#fff; text-align:left;" style-hover="background:#F8F9F7;">
+                  <sc-if value="{{ it.logo }}" hint-placeholder-val="{{ false }}"><img src="assets/aleks-logo.webp" alt="{{ it.client }}" style="width:36px; height:36px; object-fit:contain; border:1px solid #D9DDE3; border-radius:6px; padding:3px; background:#fff;"></sc-if>
+                  <sc-if value="{{ it.letter }}" hint-placeholder-val="{{ false }}"><div style="width:36px; height:36px; border-radius:6px; border:1px solid #D9DDE3; display:grid; place-items:center; font-weight:600; color:#5A6270;">{{ it.letter }}</div></sc-if>
+                  <div style="min-width:0;"><div style="font-weight:500;">{{ it.client }}</div><div style="color:#5A6270; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ it.set }}</div></div>
+                  <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:50%; background:#E4572E; flex:none;"></span><span>{{ it.what }}</span></div>
+                  <div style="color:#5A6270; font-size:13px;">чека {{ it.age }}</div>
+                  <div style="color:#5A6270; font-size:13px; text-align:right;">{{ it.writer }}</div>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- 7.2 КЛИЕНТИ -->
+    <sc-if value="{{ isClients }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:20px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Клиенти</h1>
+        <div style="color:#5A6270;">{{ clientsCount }} активни, сортирани по чекање</div>
+        <div style="flex:1;"></div>
+        <button onClick="{{ notInProto }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Нов клиент</button>
+      </div>
+      <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:36px 1.4fr 70px 1.2fr 110px 1fr 110px; gap:16px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;">
+          <span></span><span>Клиент</span><span>Јазик</span><span>Мозок</span><span>Сетови</span><span>Покриеност на аватари</span><span></span>
+        </div>
+        <sc-for list="{{ clientRows }}" as="c" hint-placeholder-count="4">
+          <button onClick="{{ c.go }}" style="display:grid; grid-template-columns:36px 1.4fr 70px 1.2fr 110px 1fr 110px; align-items:center; gap:16px; width:100%; min-height:52px; padding:8px 16px; border:0; border-top:1px solid #D9DDE3; margin-top:-1px; background:#fff; text-align:left;" style-hover="background:#F8F9F7;">
+            <sc-if value="{{ c.logo }}" hint-placeholder-val="{{ false }}"><img src="assets/aleks-logo.webp" alt="" style="width:36px; height:36px; object-fit:contain; border:1px solid #D9DDE3; border-radius:6px; padding:3px;"></sc-if>
+            <sc-if value="{{ c.letter }}" hint-placeholder-val="{{ false }}"><div style="width:36px; height:36px; border-radius:6px; border:1px solid #D9DDE3; display:grid; place-items:center; font-weight:600; color:#5A6270;">{{ c.letter }}</div></sc-if>
+            <div><div style="font-weight:500;">{{ c.name }}</div><div style="color:#5A6270; font-size:13px;">{{ c.industry }}</div></div>
+            <div style="color:#5A6270;">{{ c.lang }}</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:50%; background:{{ c.brainColor }}; flex:none;"></span><span>{{ c.brain }}</span></div>
+            <div>{{ c.setsMonth }}</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <sc-for list="{{ c.cov }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex; gap:2px;"><sc-for list="{{ a.bars }}" as="b" hint-placeholder-count="4"><span style="width:5px; height:14px; border-radius:1px; background:{{ b.color }};"></span></sc-for></div>
+              </sc-for>
+            </div>
+            <div style="text-align:right;"><sc-if value="{{ c.waiting }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px; border-radius:12px; background:#E4572E; color:#fff; font-size:13px; font-weight:500;">Чека тебе {{ c.waiting }}</span></sc-if></div>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- 7.4 / 7.5 КЛИЕНТ -->
+    <sc-if value="{{ isClient }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+        <sc-if value="{{ client.logo }}" hint-placeholder-val="{{ false }}"><img src="assets/aleks-logo.webp" alt="" style="height:44px; width:auto; max-width:180px; object-fit:contain;"></sc-if>
+        <div style="flex:1;">
+          <div style="display:flex; gap:12px; align-items:baseline;"><h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">{{ client.name }}</h1><span style="font-family:'IBM Plex Mono',monospace; color:#5A6270; font-size:13px;">{{ client.code }}</span></div>
+          <div style="color:#5A6270; display:flex; gap:14px; margin-top:2px; flex-wrap:wrap;"><span>{{ client.lang }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">{{ client.contract }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">Буџет овој месец {{ client.budget }}</span></div>
+        </div>
+        <button onClick="{{ goBrief }}" style="height:40px; padding:0 18px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; font-size:15px;">Нов сет</button>
+      </div>
+      <div style="display:flex; gap:4px; border-bottom:1px solid #D9DDE3; margin-bottom:20px;">
+        <sc-for list="{{ clientTabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.go }}" style="height:40px; padding:0 14px; border:0; background:transparent; font-size:14px; font-weight:{{ t.weight }}; color:{{ t.color }}; border-bottom:2px solid {{ t.line }}; margin-bottom:-1px;">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ isClientOverview }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; align-items:start;">
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px;">
+            <div style="padding:14px 16px; border-bottom:1px solid #D9DDE3; font-weight:500;">Што е ново</div>
+            <sc-for list="{{ whatsNew }}" as="w" hint-placeholder-count="5">
+              <div style="display:grid; grid-template-columns:48px 90px 1fr; gap:12px; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px; font-size:14px;">
+                <span style="color:#5A6270; font-size:13px;">{{ w.date }}</span><span style="color:#5A6270;">{{ w.kind }}</span><span style="text-wrap:pretty;">{{ w.text }}</span>
+              </div>
+            </sc-for>
+          </section>
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px;">
+              <div style="padding:14px 16px; border-bottom:1px solid #D9DDE3; font-weight:500; display:flex;"><span>Покриеност на аватари</span><span style="margin-left:auto; color:#5A6270; font-size:13px;">последни 4 сета</span></div>
+              <sc-for list="{{ avatarRows }}" as="a" hint-placeholder-count="5">
+                <div style="display:grid; grid-template-columns:1fr 60px 80px 90px; gap:12px; align-items:center; padding:9px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                  <span style="font-weight:500;">{{ a.name }}</span>
+                  <div style="display:flex; gap:3px;"><sc-for list="{{ a.bars }}" as="b" hint-placeholder-count="4"><span style="width:10px; height:16px; border-radius:1px; background:{{ b.color }};"></span></sc-for></div>
+                  <span style="color:#5A6270; font-size:13px;">{{ a.scripts }} сцен.</span>
+                  <span style="color:{{ a.lastColor }}; font-size:13px;">{{ a.last }}</span>
+                </div>
+              </sc-for>
+            </section>
+            <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px;">
+              <div style="padding:14px 16px; border-bottom:1px solid #D9DDE3; font-weight:500;">Сетови</div>
+              <sc-for list="{{ setRows }}" as="s" hint-placeholder-count="3">
+                <button onClick="{{ s.go }}" style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; width:100%; text-align:left; padding:10px 16px; border:0; border-top:1px solid #D9DDE3; margin-top:-1px; background:#fff;" style-hover="background:#F8F9F7;">
+                  <div><div style="font-weight:500;">{{ s.name }}</div><div style="color:#5A6270; font-size:13px;"><span style="font-family:'IBM Plex Mono',monospace;">{{ s.code }}</span> · {{ s.requested }} сценарија · {{ s.writer }}</div></div>
+                  <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ s.statusColor }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ s.statusColor }};"></span>{{ s.statusLabel }}</div>
+                </button>
+              </sc-for>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClientBrain }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; gap:20px; align-items:start;">
+          <div style="width:200px; flex:none; display:flex; flex-direction:column; gap:2px;">
+            <sc-for list="{{ brainTabs }}" as="t" hint-placeholder-count="8">
+              <button onClick="{{ t.go }}" style="text-align:left; height:36px; padding:0 12px; border:0; border-radius:6px; background:{{ t.bg }}; font-weight:{{ t.weight }};" style-hover="background:#ECEEEB;">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="flex:1; min-width:0;">
+            <sc-if value="{{ isBrainProfile }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                <span style="color:#5A6270;">Профил v3 · одобрен 28.08.2026</span>
+                <div style="flex:1;"></div>
+                <button onClick="{{ toggleDiff }}" style="height:34px; padding:0 12px; border:1px solid {{ diffBorder }}; border-radius:6px; background:{{ diffBg }}; color:{{ diffColor }};">Верзии и разлики</button>
+                <button onClick="{{ notInProto }}" style="height:34px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Ажурирај анализа</button>
+              </div>
+              <sc-if value="{{ showDiff }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px 20px; max-width:760px; margin-bottom:16px;">
+                  <div style="display:flex; gap:16px; margin-bottom:12px; font-size:13px; color:#5A6270;"><span>v3 · 28.08.2026 · одобрен</span><span>v2 · 14.07.2026</span><span>v1 · 02.06.2026</span></div>
+                  <div style="font-weight:500; margin-bottom:8px;">Разлики v2 → v3</div>
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.6; display:flex; flex-direction:column; gap:4px;">
+                    <sc-for list="{{ diffLines }}" as="d" hint-placeholder-count="4">
+                      <div style="display:grid; grid-template-columns:16px 1fr; gap:10px; color:{{ d.color }};"><span>{{ d.sign }}</span><span style="text-wrap:pretty;">{{ d.text }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:32px 40px; max-width:760px;">
+                <sc-for list="{{ profileDoc }}" as="p" hint-placeholder-count="4">
+                  <h2 style="font-size:20px; font-weight:600; margin:0 0 8px;">{{ p.title }}</h2>
+                  <p style="font-size:16px; line-height:1.55; margin:0 0 24px; max-width:68ch; text-wrap:pretty;">{{ p.text }}</p>
+                </sc-for>
+              </article>
+            </sc-if>
+            <sc-if value="{{ isBrainAvatars }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;">
+                <sc-for list="{{ avatarCards }}" as="a" hint-placeholder-count="5">
+                  <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:18px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;"><h3 style="margin:0; font-size:16px; font-weight:600;">{{ a.name }}</h3><span style="margin-left:auto; font-size:13px; color:{{ a.statusColor }};">{{ a.statusLabel }}</span></div>
+                    <p style="margin:0 0 12px; text-wrap:pretty;">{{ a.who }}</p>
+                    <dl style="margin:0; display:grid; grid-template-columns:96px 1fr; gap:6px 12px; font-size:13px;">
+                      <dt style="color:#5A6270;">Болка</dt><dd style="margin:0;">{{ a.pain }}</dd>
+                      <dt style="color:#5A6270;">Желба</dt><dd style="margin:0;">{{ a.want }}</dd>
+                      <dt style="color:#5A6270;">Зошто купува</dt><dd style="margin:0;">{{ a.why }}</dd>
+                      <dt style="color:#5A6270;">Приговори</dt><dd style="margin:0;">{{ a.objections }}</dd>
+                      <dt style="color:#5A6270;">Како зборува</dt><dd style="margin:0;">{{ a.voice }}</dd>
+                      <dt style="color:#5A6270;">Продукти</dt><dd style="margin:0;">{{ a.products }}</dd>
+                    </dl>
+                    <div style="display:flex; align-items:center; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid #D9DDE3; font-size:13px; color:#5A6270;">
+                      <div style="display:flex; gap:3px;"><sc-for list="{{ a.bars }}" as="b" hint-placeholder-count="4"><span style="width:10px; height:14px; border-radius:1px; background:{{ b.color }};"></span></sc-for></div>
+                      <span>{{ a.scripts }} сценарија · последно {{ a.last }}</span>
+                    </div>
+                  </article>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainProducts }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+                <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1.2fr 70px; gap:12px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Име</span><span>Категорија</span><span>Цена</span><span>Рата (36)</span><span>Промоција</span><span>Активен</span></div>
+                <sc-for list="{{ products }}" as="p" hint-placeholder-count="6">
+                  <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1.2fr 70px; gap:12px; align-items:center; min-height:44px; padding:6px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                    <input defaultValue="{{ p.name }}" aria-label="Име" style="border:1px solid transparent; border-radius:4px; padding:4px 6px; background:transparent; width:100%;" style-hover="border-color:#D9DDE3;" style-focus="border-color:#1B1F24; background:#fff;">
+                    <span style="color:#5A6270;">{{ p.cat }}</span>
+                    <input defaultValue="{{ p.price }}" aria-label="Цена" style="border:1px solid transparent; border-radius:4px; padding:4px 6px; background:transparent; width:100%; font-family:'IBM Plex Mono',monospace; font-size:13px;" style-hover="border-color:#D9DDE3;" style-focus="border-color:#1B1F24;">
+                    <input defaultValue="{{ p.rate }}" aria-label="Рата" style="border:1px solid transparent; border-radius:4px; padding:4px 6px; background:transparent; width:100%; font-family:'IBM Plex Mono',monospace; font-size:13px;" style-hover="border-color:#D9DDE3;" style-focus="border-color:#1B1F24;">
+                    <span style="color:#5A6270; font-size:13px;">{{ p.promo }}</span>
+                    <input type="checkbox" defaultChecked="{{ p.active }}" aria-label="Активен">
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainActors }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px;">
+                <sc-for list="{{ actors }}" as="a" hint-placeholder-count="2">
+                  <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; display:grid; grid-template-columns:120px 1fr; overflow:hidden;">
+                    <div style="background:repeating-linear-gradient(135deg,#ECEEEB 0 6px,#F5F6F4 6px 12px); display:grid; place-items:center; min-height:200px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5A6270; text-align:center; padding:8px;">фото {{ a.name }}</span></div>
+                    <div style="padding:16px;">
+                      <h3 style="margin:0; font-size:20px; font-weight:600;">{{ a.name }}</h3>
+                      <div style="color:#5A6270; margin-bottom:10px;">{{ a.role }} · {{ a.langs }}</div>
+                      <dl style="margin:0; display:grid; grid-template-columns:72px 1fr; gap:6px 10px; font-size:13px;">
+                        <dt style="color:#5A6270;">Стил</dt><dd style="margin:0;">{{ a.style }}</dd>
+                        <dt style="color:#5A6270;">Може</dt><dd style="margin:0;">{{ a.can }}</dd>
+                        <dt style="color:#5A6270;">Не може</dt><dd style="margin:0;">{{ a.cannot }}</dd>
+                        <dt style="color:#5A6270;">Забрани</dt><dd style="margin:0;">{{ a.bans }}</dd>
+                      </dl>
+                      <div style="margin-top:12px; font-size:13px; color:#5A6270;">{{ a.scripts }} сценарија</div>
+                    </div>
+                  </article>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainLocations }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;">
+                <sc-for list="{{ locations }}" as="l" hint-placeholder-count="3">
+                  <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+                    <div style="height:120px; background:repeating-linear-gradient(135deg,#ECEEEB 0 6px,#F5F6F4 6px 12px); display:grid; place-items:center;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5A6270;">слика {{ l.name }}</span></div>
+                    <div style="padding:16px;">
+                      <h3 style="margin:0 0 4px; font-size:16px; font-weight:600;">{{ l.name }}</h3>
+                      <p style="margin:0 0 10px; text-wrap:pretty;">{{ l.desc }}</p>
+                      <dl style="margin:0; display:grid; grid-template-columns:96px 1fr; gap:6px 10px; font-size:13px;">
+                        <dt style="color:#5A6270;">Се користи</dt><dd style="margin:0;">{{ l.use }}</dd>
+                        <dt style="color:#5A6270;">Ограничувања</dt><dd style="margin:0;">{{ l.limits }}</dd>
+                      </dl>
+                    </div>
+                  </article>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainCompetitors }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ hasProposals }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:20px;">
+                  <div style="font-weight:500; margin-bottom:8px; display:flex; gap:8px; align-items:center;"><span style="width:8px; height:8px; border-radius:50%; background:#E4572E;"></span>Предлози за потврда</div>
+                  <sc-for list="{{ proposals }}" as="p" hint-placeholder-count="1">
+                    <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px; display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center;">
+                      <div><div style="font-weight:600;">{{ p.name }} <span style="color:#5A6270; font-weight:400; font-size:13px;">{{ p.links }}</span></div><div style="text-wrap:pretty;">{{ p.why }}</div><div style="color:#5A6270; font-size:13px;">{{ p.source }}</div></div>
+                      <div style="display:flex; gap:8px;"><button onClick="{{ p.reject }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Отфрли</button><button onClick="{{ p.confirm }}" style="height:36px; padding:0 14px; border:0; border-radius:6px; background:#E4572E; color:#fff; font-weight:500;">Потврди</button></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+                <sc-for list="{{ competitors }}" as="c" hint-placeholder-count="2">
+                  <div style="display:grid; grid-template-columns:1fr 1.4fr 1.4fr 110px; gap:16px; padding:12px 16px; border-top:1px solid #D9DDE3; margin-top:-1px; align-items:center;">
+                    <div><div style="font-weight:500;">{{ c.name }}</div><div style="color:#5A6270; font-size:13px;">{{ c.links }}</div></div>
+                    <div style="font-size:14px;">{{ c.why }}</div>
+                    <div style="font-size:14px;"><span style="color:#5A6270;">Ова не: </span>{{ c.not }}</div>
+                    <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ c.statusColor }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ c.statusColor }};"></span>{{ c.statusLabel }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainReferences }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+                <sc-for list="{{ references }}" as="r" hint-placeholder-count="2">
+                  <div style="display:grid; grid-template-columns:100px 1.2fr 110px 2fr; gap:16px; padding:12px 16px; border-top:1px solid #D9DDE3; margin-top:-1px; align-items:center;">
+                    <span>{{ r.platform }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#5A6270; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.link }}</span>
+                    <span style="font-size:13px; padding:2px 8px; border:1px solid #D9DDE3; border-radius:10px; text-align:center;">{{ r.flag }}</span>
+                    <span style="text-wrap:pretty;">{{ r.note }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainGlossary }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+                <div style="display:grid; grid-template-columns:60px 1.3fr 2fr 140px; gap:16px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Јазик</span><span>Термин</span><span>Значење</span><span>Вид</span></div>
+                <sc-for list="{{ glossary }}" as="g" hint-placeholder-count="5">
+                  <div style="display:grid; grid-template-columns:60px 1.3fr 2fr 140px; gap:16px; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px; align-items:center; min-height:44px;">
+                    <span style="color:#5A6270;">{{ g.lang }}</span><span style="font-weight:500;">{{ g.term }}</span><span>{{ g.meaning }}</span><span style="color:{{ g.kindColor }}; font-size:13px;">{{ g.kind }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isBrainInsights }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px 24px; max-width:560px;">
+                <div style="font-size:16px; margin-bottom:6px;">Инсајтите доаѓаат со резултатите од рекламите (Фаза 2).</div>
+                <div style="color:#5A6270;">Дотогаш системот учи од ѕвезда примерите означени во базата.</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClientSets }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden; max-width:900px;">
+          <sc-for list="{{ setRows }}" as="s" hint-placeholder-count="3">
+            <button onClick="{{ s.go }}" style="display:grid; grid-template-columns:130px 1fr 130px 90px 170px; gap:16px; align-items:center; width:100%; text-align:left; min-height:52px; padding:8px 16px; border:0; border-top:1px solid #D9DDE3; margin-top:-1px; background:#fff;" style-hover="background:#F8F9F7;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ s.code }}</span>
+              <span style="font-weight:500;">{{ s.name }}</span>
+              <span style="color:#5A6270; font-size:13px;">{{ s.requested }} сценарија · {{ s.writer }}</span>
+              <span style="color:#5A6270; font-size:13px;">{{ s.created }}</span>
+              <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ s.statusColor }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ s.statusColor }};"></span>{{ s.statusLabel }}</div>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- 7.6 БРИФ -->
+    <sc-if value="{{ isBrief }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:760px;">
+        <div style="margin-bottom:20px;"><h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Нов сет</h1><div style="color:#5A6270;">Бриф за Креативниот директор. Три минути.</div></div>
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px;">
+            <div style="display:flex; align-items:center; gap:12px;"><span style="color:#5A6270; width:140px;">Клиент</span><sc-if value="{{ client.logo }}" hint-placeholder-val="{{ false }}"><img src="assets/aleks-logo.webp" alt="" style="height:28px;"></sc-if><span style="font-weight:500;">{{ client.name }}</span><span style="color:#5A6270;">{{ client.lang }}</span></div>
+            <details style="margin-top:14px; border-top:1px solid #D9DDE3; padding-top:12px;">
+              <summary style="cursor:pointer; font-weight:500;">Што е ново од последниот сет <span style="color:#5A6270; font-weight:400;">{{ whatsNewCount }} промени</span></summary>
+              <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+                <sc-for list="{{ whatsNew }}" as="w" hint-placeholder-count="3"><div style="display:grid; grid-template-columns:48px 90px 1fr; gap:12px; font-size:14px;"><span style="color:#5A6270; font-size:13px;">{{ w.date }}</span><span style="color:#5A6270;">{{ w.kind }}</span><span>{{ w.text }}</span></div></sc-for>
+              </div>
+            </details>
+          </section>
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px; display:grid; grid-template-columns:140px 1fr; gap:16px 12px; align-items:start;">
+            <label for="bn" style="color:#5A6270; padding-top:8px;">Број на сценарија</label>
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="display:inline-flex; border:1px solid #D9DDE3; border-radius:6px; overflow:hidden;"><button onClick="{{ decN }}" aria-label="Помалку" style="width:36px; height:36px; border:0; background:#fff; font-size:18px;">−</button><span id="bn" style="width:44px; display:grid; place-items:center; font-weight:600; border-left:1px solid #D9DDE3; border-right:1px solid #D9DDE3;">{{ briefN }}</span><button onClick="{{ incN }}" aria-label="Повеќе" style="width:36px; height:36px; border:0; background:#fff; font-size:18px;">+</button></div>
+              <span style="color:#5A6270; font-size:13px;">Креативниот директор предлага {{ briefN2 }} концепти.</span>
+            </div>
+            <span style="color:#5A6270; padding-top:6px;">Распределба по тип</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <sc-for list="{{ typeChips }}" as="t" hint-placeholder-count="5">
+                <button onClick="{{ t.toggle }}" aria-pressed="{{ t.on }}" style="height:32px; padding:0 12px; border:1px solid {{ t.border }}; border-radius:16px; background:{{ t.bg }}; color:{{ t.color }}; font-size:14px;">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <label for="bp" style="color:#5A6270; padding-top:8px;">Продукт / понуда</label>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <select id="bp" value="{{ briefProduct }}" onChange="{{ setBriefProduct }}" style="height:36px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; max-width:420px;">
+                <sc-for list="{{ productOptions }}" as="p" hint-placeholder-count="3"><option value="{{ p.name }}">{{ p.name }}</option></sc-for>
+              </select>
+              <input value="{{ briefOffer }}" onChange="{{ setBriefOffer }}" placeholder="Понуда со свои зборови (по избор)" style="height:36px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; max-width:420px;">
+            </div>
+          </section>
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px;">
+            <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:12px;"><span style="font-weight:500;">Аватари</span><span style="color:#5A6270; font-size:13px;">Системот предлага два според покриеност</span></div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px;">
+              <sc-for list="{{ briefAvatars }}" as="a" hint-placeholder-count="5">
+                <button onClick="{{ a.toggle }}" aria-pressed="{{ a.on }}" style="text-align:left; padding:12px; border:1px solid {{ a.border }}; border-radius:6px; background:{{ a.bg }}; display:flex; gap:10px; align-items:flex-start;">
+                  <span style="width:18px; height:18px; border:1.5px solid {{ a.boxBorder }}; border-radius:4px; background:{{ a.boxBg }}; flex:none; margin-top:2px; display:grid; place-items:center;"><span style="width:8px; height:8px; background:#fff; border-radius:1px; opacity:{{ a.checkOpacity }};"></span></span>
+                  <span style="flex:1; min-width:0;">
+                    <span style="display:flex; align-items:baseline; gap:8px;"><span style="font-weight:500;">{{ a.name }}</span><sc-if value="{{ a.suggested }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px; color:#5A6270; border:1px solid #D9DDE3; border-radius:8px; padding:0 6px;">предлог</span></sc-if></span>
+                    <span style="display:block; font-size:13px; color:#5A6270; margin-top:2px;">{{ a.who }}</span>
+                    <span style="display:flex; gap:3px; margin-top:8px;"><sc-for list="{{ a.bars }}" as="b" hint-placeholder-count="4"><span style="width:10px; height:12px; border-radius:1px; background:{{ b.color }};"></span></sc-for></span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px;">
+            <div style="font-weight:500; margin-bottom:12px;">Актери и локации достапни за ова снимање</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <sc-for list="{{ briefActors }}" as="a" hint-placeholder-count="2">
+                  <button onClick="{{ a.toggle }}" aria-pressed="{{ a.on }}" style="display:flex; gap:12px; align-items:center; padding:8px 10px; border:1px solid {{ a.border }}; border-radius:6px; background:{{ a.bg }}; text-align:left;">
+                    <span style="width:40px; height:40px; border-radius:50%; background:repeating-linear-gradient(135deg,#ECEEEB 0 4px,#F5F6F4 4px 8px); flex:none;"></span>
+                    <span style="flex:1;"><span style="display:block; font-weight:500;">{{ a.name }}</span><span style="display:block; font-size:13px; color:#5A6270;">{{ a.role }} · {{ a.langs }}</span></span>
+                    <span style="width:18px; height:18px; border:1.5px solid {{ a.boxBorder }}; border-radius:4px; background:{{ a.boxBg }};"></span>
+                  </button>
+                </sc-for>
+                <button onClick="{{ notInProto }}" style="height:36px; border:1px dashed #D9DDE3; border-radius:6px; background:transparent; color:#5A6270;">+ нов актер</button>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <sc-for list="{{ briefLocations }}" as="l" hint-placeholder-count="3">
+                  <button onClick="{{ l.toggle }}" aria-pressed="{{ l.on }}" style="display:flex; gap:12px; align-items:center; padding:8px 10px; border:1px solid {{ l.border }}; border-radius:6px; background:{{ l.bg }}; text-align:left;">
+                    <span style="width:40px; height:40px; border-radius:6px; background:repeating-linear-gradient(135deg,#ECEEEB 0 4px,#F5F6F4 4px 8px); flex:none;"></span>
+                    <span style="flex:1;"><span style="display:block; font-weight:500;">{{ l.name }}</span><span style="display:block; font-size:13px; color:#5A6270;">{{ l.limits }}</span></span>
+                    <span style="width:18px; height:18px; border:1.5px solid {{ l.boxBorder }}; border-radius:4px; background:{{ l.boxBg }};"></span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </section>
+          <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px; display:grid; grid-template-columns:140px 1fr; gap:16px 12px; align-items:start;">
+            <label for="bnotes" style="color:#5A6270; padding-top:8px;">Што кажа клиентот</label>
+            <textarea id="bnotes" value="{{ briefNotes }}" onChange="{{ setBriefNotes }}" rows="3" placeholder="Забелешки, може празно" style="width:100%; padding:8px 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; resize:vertical; line-height:1.5;"></textarea>
+            <label for="binsp" style="color:#5A6270; padding-top:8px;">Инспирација</label>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <input id="binsp" value="{{ briefInsp }}" onChange="{{ setBriefInsp }}" placeholder="Линк или вметнат транскрипт" style="height:36px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">
+              <div style="display:flex; gap:16px; color:#5A6270;"><label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="insp" checked="{{ inspRework }}" onChange="{{ setInspRework }}"> Преработи за клиентот</label><label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="insp" checked="{{ inspNot }}" onChange="{{ setInspNot }}"> Ова не</label></div>
+            </div>
+            <label for="bcons" style="color:#5A6270; padding-top:8px;">Ограничувања</label>
+            <div style="display:flex; gap:10px;">
+              <input id="bcons" value="{{ briefCons }}" onChange="{{ setBriefCons }}" placeholder="Што да не се прави" style="flex:1; height:36px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">
+              <select value="{{ briefSec }}" onChange="{{ setBriefSec }}" aria-label="Времетраење" style="height:36px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;"><option value="30">~30 сек</option><option value="45">~45 сек</option><option value="60">~60 сек</option></select>
+            </div>
+          </section>
+          <div style="display:flex; align-items:center; gap:16px; padding-bottom:40px;">
+            <button onClick="{{ generate }}" style="height:44px; padding:0 22px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; font-size:15px;" style-hover="background:#2b3038;">Генерирај концепти</button>
+            <span style="color:#5A6270;">{{ briefSummary }}</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- СЕТ -->
+    <sc-if value="{{ isSet }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+        <button onClick="{{ goClient }}" style="border:0; background:transparent; padding:0; color:#5A6270; display:flex; align-items:center; gap:8px;" style-hover="color:#1B1F24;"><sc-if value="{{ client.logo }}" hint-placeholder-val="{{ false }}"><img src="assets/aleks-logo.webp" alt="" style="height:24px;"></sc-if>{{ client.name }}</button>
+        <span style="color:#D9DDE3;">/</span>
+        <h1 style="font-size:20px; font-weight:600; margin:0;">{{ set.name }}</h1>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#5A6270;">{{ set.code }}</span>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ setStatusColor }}; border:1px solid #D9DDE3; border-radius:12px; padding:2px 10px; background:#fff;"><span style="width:8px; height:8px; border-radius:50%; background:{{ setStatusColor }};"></span>{{ setStatusLabel }}</div>
+        <div style="flex:1;"></div>
+        <span style="color:#5A6270; font-size:13px;">{{ set.writer }} · {{ set.created }}</span>
+      </div>
+      <div style="display:flex; gap:4px; border-bottom:1px solid #D9DDE3; margin-bottom:20px;">
+        <sc-for list="{{ setTabs }}" as="t" hint-placeholder-count="6">
+          <button onClick="{{ t.go }}" style="height:40px; padding:0 14px; border:0; background:transparent; font-size:14px; font-weight:{{ t.weight }}; color:{{ t.color }}; border-bottom:2px solid {{ t.line }}; margin-bottom:-1px; display:flex; align-items:center; gap:8px;">{{ t.label }}<sc-if value="{{ t.dot }}" hint-placeholder-val="{{ false }}"><span style="width:8px; height:8px; border-radius:50%; background:#E4572E;"></span></sc-if></button>
+        </sc-for>
+      </div>
+
+      <!-- Сет · Бриф -->
+      <sc-if value="{{ isSetBrief }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px; max-width:760px; display:grid; grid-template-columns:160px 1fr; gap:12px 16px;">
+          <span style="color:#5A6270;">Сценарија</span><span>{{ set.requested }}</span>
+          <span style="color:#5A6270;">Продукт / понуда</span><span>{{ set.product }}</span>
+          <span style="color:#5A6270;">Аватари</span><span>{{ setAvatarsText }}</span>
+          <span style="color:#5A6270;">Актери и локации</span><span>{{ setActorsText }}</span>
+          <span style="color:#5A6270;">Забелешки</span><span>{{ setNotesText }}</span>
+        </div>
+      </sc-if>
+
+      <!-- 7.7 КОНЦЕПТИ -->
+      <sc-if value="{{ isSetConcepts }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ conceptsGenerating }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:24px; max-width:560px;">
+            <div style="font-size:16px; margin-bottom:10px;">Се генерираат концепти</div>
+            <div style="height:3px; background:#ECEEEB; border-radius:2px; overflow:hidden;"><div style="height:100%; background:#1B1F24; width:{{ progressPct }}; transition:width .4s;"></div></div>
+            <div style="color:#5A6270; margin-top:10px; font-size:13px;">{{ set.requested }} барани сценарија · Креативниот директор чита профил, аватари и последни резултати. Можеш да продолжиш со друга работа — ќе се појави во „Чека тебе“.</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ conceptsDecided }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:24px; max-width:560px;">
+            <div style="font-size:16px; margin-bottom:6px;">Концептите за овој сет се избрани.</div>
+            <div style="color:#5A6270; margin-bottom:14px;">{{ conceptsDecidedText }}</div>
+            <button onClick="{{ goSetScripts }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Кон сценаријата</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ conceptsReady }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:20px; align-items:start;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px;">
+              <sc-for list="{{ conceptCards }}" as="c" hint-placeholder-count="4">
+                <article style="background:#fff; border:1px solid {{ c.border }}; border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:10px; opacity:{{ c.opacity }}; transition:border-color .15s, opacity .15s;">
+                  <div style="display:flex; gap:8px; align-items:center; font-size:13px; color:#5A6270;">
+                    <span style="border:1px solid #D9DDE3; border-radius:10px; padding:0 8px;">{{ c.typeLabel }}</span>
+                    <span>{{ c.avatarName }}</span>
+                    <sc-if value="{{ c.suggested }}" hint-placeholder-val="{{ false }}"><span style="color:#B7791F;">непокриен аватар</span></sc-if>
+                    <span style="margin-left:auto; font-family:'IBM Plex Mono',monospace;">~{{ c.sec }}s</span>
+                  </div>
+                  <div style="font-size:20px; font-weight:600; line-height:1.25; text-wrap:pretty;">{{ c.hook }}</div>
+                  <div style="color:#5A6270; font-size:14px;">{{ c.insight }}</div>
+                  <div style="font-size:13px; display:flex; gap:12px;"><span><span style="color:#5A6270;">Актер </span>{{ c.actorName }}</span><span><span style="color:#5A6270;">Локација </span>{{ c.locationName }}</span></div>
+                  <div style="font-size:13px; border-top:1px solid #D9DDE3; padding-top:10px; text-wrap:pretty;"><span style="color:#5A6270;">Зошто треба да работи: </span>{{ c.why }}</div>
+                  <sc-if value="{{ c.comment }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px; background:#F5F6F4; border-radius:6px; padding:8px 10px;"><span style="color:#5A6270;">Твој коментар: </span>{{ c.comment }}</div></sc-if>
+                  <sc-if value="{{ c.commenting }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; gap:8px;"><input autoFocus="{{ true }}" value="{{ conceptCommentDraft }}" onChange="{{ setConceptComment }}" placeholder="Што да се смени во оваа насока" style="flex:1; height:34px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px;"><button onClick="{{ c.saveComment }}" style="height:34px; padding:0 12px; border:0; border-radius:6px; background:#1B1F24; color:#fff;">Зачувај</button></div>
+                  </sc-if>
+                  <div style="display:flex; gap:6px; margin-top:auto; padding-top:4px; flex-wrap:wrap;">
+                    <button onClick="{{ c.select }}" style="height:34px; padding:0 12px; border:1px solid {{ c.selBorder }}; border-radius:6px; background:{{ c.selBg }}; color:{{ c.selColor }}; font-weight:500;">{{ c.selLabel }}</button>
+                    <button onClick="{{ c.reject }}" style="height:34px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; color:#5A6270;">{{ c.rejLabel }}</button>
+                    <button onClick="{{ c.startComment }}" style="height:34px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; color:#5A6270;">Коментар</button>
+                    <button onClick="{{ c.cycleAvatar }}" style="height:34px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; color:#5A6270;">Смени аватар</button>
+                  </div>
+                </article>
+              </sc-for>
+            </div>
+            <aside style="position:sticky; top:80px; background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:20px; font-weight:600;">Избрани {{ selectedCount }} од {{ set.requested }} барани</div>
+              <div style="color:#5A6270; font-size:13px;">{{ selectedHint }}</div>
+              <button onClick="{{ moreCards }}" disabled="{{ moreDisabled }}" style="height:38px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; text-align:left; padding:0 12px; opacity:{{ moreOpacity }};">Уште 3 карти во оваа насока</button>
+              <sc-if value="{{ moreGenerating }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px; color:#5A6270;">Се генерираат 3 карти од избраната насока</div><div style="height:3px; background:#ECEEEB; border-radius:2px; overflow:hidden;"><div style="height:100%; background:#1B1F24; width:{{ progressPct }}; transition:width .4s;"></div></div></sc-if>
+              <button onClick="{{ writeSelected }}" disabled="{{ writeDisabled }}" style="height:44px; border:0; border-radius:6px; background:#E4572E; color:#fff; font-weight:600; font-size:15px; opacity:{{ writeOpacity }};" style-hover="background:#cf4b25;">Пиши ги избраните</button>
+              <div style="color:#5A6270; font-size:13px;">Отфрлените картички остануваат во сетот како „не“ за следниот пат.</div>
+            </aside>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <!-- 7.8 СЦЕНАРИЈА -->
+      <sc-if value="{{ isSetScripts }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ noScriptsYet }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px 24px; max-width:560px;">
+            <div style="font-size:16px; margin-bottom:12px;">Сценаријата почнуваат кога ќе ги избереш концептите.</div>
+            <button onClick="{{ goSetConcepts }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Отвори концепти</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasScripts }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ writingLine }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; align-items:center; gap:16px; margin-bottom:14px; color:#5A6270; font-size:14px;"><span>{{ writingLine }}</span><div style="width:160px; height:3px; background:#ECEEEB; border-radius:2px; overflow:hidden;"><div style="height:100%; background:#1B1F24; width:{{ writingPct }}; transition:width .4s;"></div></div></div>
+        </sc-if>
+        <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;">
+          <!-- листа -->
+          <div style="flex:1 1 200px; max-width:230px; min-width:180px; position:sticky; top:80px; display:flex; flex-direction:column; gap:2px;">
+            <sc-for list="{{ scriptList }}" as="s" hint-placeholder-count="3">
+              <button onClick="{{ s.go }}" aria-current="{{ s.current }}" style="text-align:left; padding:10px 12px; border:1px solid {{ s.border }}; border-radius:6px; background:{{ s.bg }};" style-hover="background:#fff;">
+                <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5A6270;">{{ s.nn }}</span><span style="font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ s.title }}</span></div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:4px; font-size:13px; color:{{ s.statusColor }};"><span style="width:7px; height:7px; border-radius:50%; background:{{ s.statusColor }};"></span>{{ s.statusLabel }}</div>
+              </button>
+            </sc-for>
+          </div>
+
+          <!-- ScriptView -->
+          <div style="flex:100 1 460px; min-width:0; overflow-wrap:anywhere;">
+            <sc-if value="{{ scriptWriting }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px; color:#5A6270;">
+                <div style="font-size:16px; color:#1B1F24; margin-bottom:6px;">{{ script.title }}</div>
+                <div>{{ scriptStatusLabel }}. Ќе се појави во „Чека тебе“ кога Критичарот ќе заврши.</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ scriptReadable }}" hint-placeholder-val="{{ true }}">
+            <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:32px clamp(16px,4%,40px) 120px; position:relative; min-width:0;">
+              <sc-if value="{{ scriptFailed }}" hint-placeholder-val="{{ false }}"><div style="display:inline-flex; align-items:center; gap:8px; color:#B7791F; font-size:13px; border:1px solid #B7791F; border-radius:12px; padding:2px 10px; margin-bottom:14px;"><span style="width:8px; height:8px; border-radius:50%; background:#B7791F;"></span>Не помина критика по 2 круга · {{ findingsCount }} наоди</div></sc-if>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#5A6270; margin-bottom:6px;">СЦЕНАРИО {{ scriptNN }}</div>
+              <h2 style="font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; margin:0 0 10px; line-height:1.3;">{{ script.title }}</h2>
+              <div style="display:flex; flex-wrap:wrap; gap:0 14px; color:#5A6270; font-size:13px; padding-bottom:18px; border-bottom:1px solid #D9DDE3; margin-bottom:24px;">
+                <span>{{ scriptTypeLabel }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">{{ scriptAvatarName }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">{{ scriptActorName }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">{{ scriptLocationName }}</span><span style="border-left:1px solid #D9DDE3; padding-left:14px;">~{{ script.sec }} сек</span><span style="border-left:1px solid #D9DDE3; padding-left:14px; font-family:'IBM Plex Mono',monospace; color:#1B1F24;">{{ script.code }}</span><span style="margin-left:auto;">верзија {{ script.version }}</span>
+              </div>
+              <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px; color:#5A6270; margin-bottom:12px; padding:8px 12px; background:#F5F6F4; border-radius:6px;">Уредуваш директно во сценариото. Зачувувањето создава верзија {{ nextVersion }}.</div></sc-if>
+              <div contentEditable="{{ editing }}" suppressContentEditableWarning="{{ true }}" spellCheck="{{ false }}" style="font-family:'IBM Plex Mono',monospace; font-size:16px; line-height:1.7; display:flex; flex-direction:column; gap:26px; outline:none; border-radius:6px; padding:{{ editPad }}; background:{{ editBg }}; transition:background .15s;">
+                <sc-for list="{{ frames }}" as="f" hint-placeholder-count="4">
+                  <section id="{{ f.anchor }}" style="display:grid; grid-template-columns:minmax(90px,110px) minmax(0,68ch); gap:16px; scroll-margin-top:90px; border-radius:6px; background:{{ f.bg }}; margin:-6px; padding:6px; transition:background .3s;">
+                    <div style="color:#5A6270; font-size:13px; line-height:1.7;"><div style="font-weight:600; color:#1B1F24;">{{ f.role }}</div><div>Кадар {{ f.n }}</div><sc-if value="{{ f.sub }}" hint-placeholder-val="{{ false }}"><div style="font-style:italic;">{{ f.sub }}</div></sc-if></div>
+                    <div style="display:flex; flex-direction:column; gap:10px; min-width:0;">
+                      <p data-e="d" style="margin:0; font-style:italic; color:#5A6270; text-wrap:pretty;">{{ f.direction }}</p>
+                      <sc-if value="{{ f.table }}" hint-placeholder-val="{{ false }}">
+                        <table style="border-collapse:collapse; font-size:14px; width:100%; margin:4px 0;">
+                          <thead><tr><sc-for list="{{ f.tableHead }}" as="h" hint-placeholder-count="3"><th style="text-align:left; font-weight:600; padding:6px 8px; border-bottom:1px solid #1B1F24; color:#5A6270; font-size:13px;">{{ h.t }}</th></sc-for></tr></thead>
+                          <tbody><sc-for list="{{ f.tableRows }}" as="r" hint-placeholder-count="3"><tr><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="3"><td style="padding:6px 8px; border-bottom:1px solid #D9DDE3; white-space:nowrap;">{{ c.t }}</td></sc-for></tr></sc-for></tbody>
+                        </table>
+                      </sc-if>
+                      <sc-for list="{{ f.lines }}" as="l" hint-placeholder-count="1">
+                        <p style="margin:0; text-wrap:pretty;"><span contentEditable="{{ false }}" style="font-weight:600;">{{ l.actor }}:</span> <span data-e="{{ l.key }}">{{ l.text }}</span></p>
+                      </sc-for>
+                      <sc-if value="{{ f.editing }}" hint-placeholder-val="{{ false }}"><p style="margin:0; font-size:14px; color:#5A6270; border-left:2px solid #D9DDE3; padding-left:10px;">Монтажа: <span data-e="m">{{ f.editing }}</span></p></sc-if>
+                    </div>
+                  </section>
+                </sc-for>
+              </div>
+              <!-- Верзии -->
+              <details style="margin-top:36px; border-top:1px solid #D9DDE3; padding-top:14px; font-size:13px; color:#5A6270;">
+                <summary style="cursor:pointer;">Верзии ({{ versionsCount }})</summary>
+                <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;"><sc-for list="{{ versions }}" as="v" hint-placeholder-count="1"><div style="display:grid; grid-template-columns:32px 1fr auto; gap:12px;"><span style="font-family:'IBM Plex Mono',monospace;">v{{ v.v }}</span><span>{{ v.who }}</span><span>{{ v.when }}</span></div></sc-for></div>
+              </details>
+              <!-- CheckpointBar -->
+              <sc-if value="{{ showCheckpoint }}" hint-placeholder-val="{{ true }}">
+              <div style="position:sticky; bottom:16px; margin:24px 0 -100px; padding:12px 16px; background:#fff; border:1px solid #D9DDE3; border-radius:10px; box-shadow:0 8px 24px rgba(27,31,36,.10); display:flex; flex-direction:column; gap:10px;">
+                <sc-if value="{{ returning }}" hint-placeholder-val="{{ false }}">
+                  <textarea autoFocus="{{ true }}" value="{{ comment }}" onChange="{{ setComment }}" rows="3" placeholder="Што да се смени. Писателот продолжува во истата сесија." style="width:100%; padding:8px 10px; border:1px solid #D9DDE3; border-radius:6px; resize:vertical; line-height:1.5;"></textarea>
+                </sc-if>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <sc-if value="{{ normalMode }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ approve }}" style="height:40px; padding:0 18px; border:0; border-radius:6px; background:#E4572E; color:#fff; font-weight:600; font-size:15px;" style-hover="background:#cf4b25;">Одобри</button>
+                    <button onClick="{{ startEdit }}" style="height:40px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Доработи рачно</button>
+                    <button onClick="{{ startReturn }}" style="height:40px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Врати со коментар</button>
+                    <span style="margin-left:auto; color:#5A6270; font-size:13px;">{{ checkpointHint }}</span>
+                  </sc-if>
+                  <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ saveEdit }}" style="height:40px; padding:0 18px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500;">Зачувај верзија {{ nextVersion }}</button>
+                    <button onClick="{{ cancelEdit }}" style="height:40px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Откажи</button>
+                  </sc-if>
+                  <sc-if value="{{ returning }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ sendReturn }}" disabled="{{ commentEmpty }}" style="height:40px; padding:0 18px; border:0; border-radius:6px; background:#E4572E; color:#fff; font-weight:600; opacity:{{ commentOpacity }};">Испрати</button>
+                    <button onClick="{{ cancelReturn }}" style="height:40px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Откажи</button>
+                  </sc-if>
+                </div>
+              </div>
+              </sc-if>
+              <sc-if value="{{ scriptApproved }}" hint-placeholder-val="{{ false }}">
+                <div style="position:sticky; bottom:16px; margin:24px 0 -100px; padding:12px 16px; background:#fff; border:1px solid #D9DDE3; border-radius:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; box-shadow:0 8px 24px rgba(27,31,36,.10);">
+                  <span style="display:flex; align-items:center; gap:8px; color:#2F7D4F; font-weight:500;"><span style="width:8px; height:8px; border-radius:50%; background:#2F7D4F;"></span>{{ scriptStatusLabel }}</span>
+                  <button onClick="{{ startEdit }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Доработи рачно</button>
+                  <sc-if value="{{ allApproved }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goSetExport }}" style="margin-left:auto; height:36px; padding:0 14px; border:0; border-radius:6px; background:#1B1F24; color:#fff;">Кон експорт</button></sc-if>
+                </div>
+              </sc-if>
+            </article>
+            </sc-if>
+          </div>
+
+          <!-- ContextSheet -->
+          <aside style="flex:1 1 {{ ctxBasis }}; max-width:{{ ctxWidth }}; min-width:0; position:sticky; top:80px;">
+            <sc-if value="{{ ctxClosed }}" hint-placeholder-val="{{ false }}"><button onClick="{{ toggleCtx }}" aria-label="Отвори контекст" style="width:36px; height:36px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; color:#5A6270;">‹</button></sc-if>
+            <sc-if value="{{ ctxOpen }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+              <div style="display:flex; border-bottom:1px solid #D9DDE3;">
+                <sc-for list="{{ ctxTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.go }}" style="flex:1; height:40px; border:0; background:transparent; font-weight:{{ t.weight }}; color:{{ t.color }}; border-bottom:2px solid {{ t.line }}; margin-bottom:-1px;">{{ t.label }}</button></sc-for>
+                <button onClick="{{ toggleCtx }}" aria-label="Затвори контекст" style="width:40px; border:0; background:transparent; color:#5A6270;">›</button>
+              </div>
+              <sc-if value="{{ ctxCritic }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:14px 16px;">
+                  <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:12px;"><span style="font-size:20px; font-weight:600;">{{ criticTotal }}%</span><span style="color:{{ criticColor }}; font-size:13px;">{{ criticVerdict }}</span></div>
+                  <div style="display:flex; flex-direction:column; gap:7px;">
+                    <sc-for list="{{ criteria }}" as="c" hint-placeholder-count="11">
+                      <div style="display:grid; grid-template-columns:1fr 64px 14px; gap:10px; align-items:center; font-size:13px;">
+                        <span style="color:{{ c.color }};">{{ c.name }}</span>
+                        <div style="display:flex; gap:2px;"><sc-for list="{{ c.pips }}" as="p" hint-placeholder-count="5"><span style="width:10px; height:8px; border-radius:1px; background:{{ p.color }};"></span></sc-for></div>
+                        <span style="color:#5A6270; text-align:right;">{{ c.score }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="border-top:1px solid #D9DDE3; padding:14px 16px;">
+                  <div style="font-weight:500; margin-bottom:8px;">Наоди на Критичарот <span style="color:#5A6270; font-weight:400;">{{ findingsCount }}</span></div>
+                  <sc-if value="{{ noFindings }}" hint-placeholder-val="{{ false }}"><div style="color:#5A6270; font-size:13px;">Нема наоди. Сите критериуми над прагот.</div></sc-if>
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <sc-for list="{{ findings }}" as="f" hint-placeholder-count="0">
+                      <div style="font-size:13px; text-wrap:pretty;"><div>{{ f.text }}</div><button onClick="{{ f.jump }}" style="border:0; background:transparent; padding:0; color:#5A6270; text-decoration:underline; font-size:13px; margin-top:2px;" style-hover="color:#1B1F24;">Скокни до кадар {{ f.frame }}</button></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ctxContext }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:14px 16px; display:flex; flex-direction:column; gap:14px; font-size:13px;">
+                  <div style="border:1px solid #D9DDE3; border-radius:6px; padding:10px 12px;"><div style="color:#5A6270; margin-bottom:2px;">Аватар</div><div style="font-weight:600; font-size:14px;">{{ scriptAvatar.name }}</div><div>{{ scriptAvatar.who }}</div><div style="color:#5A6270; margin-top:4px;">Болка: {{ scriptAvatar.pain }}</div></div>
+                  <div style="border:1px solid #D9DDE3; border-radius:6px; padding:10px 12px; display:grid; grid-template-columns:44px 1fr; gap:10px;"><span style="width:44px; height:44px; border-radius:50%; background:repeating-linear-gradient(135deg,#ECEEEB 0 4px,#F5F6F4 4px 8px);"></span><div><div style="color:#5A6270;">Актер</div><div style="font-weight:600; font-size:14px;">{{ scriptActor.name }}</div><div>{{ scriptActor.style }}</div><div style="color:#5A6270; margin-top:2px;">Не може: {{ scriptActor.cannot }}</div></div></div>
+                  <div style="border:1px solid #D9DDE3; border-radius:6px; padding:10px 12px;"><div style="color:#5A6270;">Локација</div><div style="font-weight:600; font-size:14px;">{{ scriptLocation.name }}</div><div>{{ scriptLocation.limits }}</div></div>
+                  <div style="border:1px solid #D9DDE3; border-radius:6px; padding:10px 12px;"><div style="color:#5A6270;">Продукт во фокус</div><div style="font-weight:600; font-size:14px;">{{ set.product }}</div></div>
+                </div>
+              </sc-if>
+            </div>
+            </sc-if>
+          </aside>
+        </div>
+        </sc-if>
+      </sc-if>
+
+      <!-- 7.10 Транскрипти / Трошок -->
+      <sc-if value="{{ isSetTranscripts }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; gap:4px; margin-bottom:12px; flex-wrap:wrap;">
+          <sc-for list="{{ runTabs }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.go }}" style="height:30px; padding:0 10px; border:1px solid {{ r.border }}; border-radius:6px; background:{{ r.bg }}; font-family:'IBM Plex Mono',monospace; font-size:12px;">{{ r.label }}</button></sc-for>
+        </div>
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.6; overflow:hidden;">
+          <sc-for list="{{ transcript }}" as="m" hint-placeholder-count="6">
+            <details open="{{ m.open }}" style="border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <summary style="display:grid; grid-template-columns:90px 1fr; gap:12px; padding:8px 14px; cursor:pointer; list-style:none;"><span style="color:#5A6270;">{{ m.role }}</span><span style="color:{{ m.color }}; overflow:hidden; text-overflow:ellipsis; white-space:{{ m.wrap }};">{{ m.text }}</span></summary>
+            </details>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isSetCost }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:620px;">
+          <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:12px;"><span style="font-size:28px; font-weight:600;">{{ set.cost }}</span><span style="color:#5A6270;">од буџет {{ set.budget }} за сетот</span></div>
+          <div style="height:4px; background:#ECEEEB; border-radius:2px; overflow:hidden; margin-bottom:20px;"><div style="height:100%; width:{{ costPct }}; background:#1B1F24;"></div></div>
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+            <sc-for list="{{ costs }}" as="c" hint-placeholder-count="4"><div style="display:grid; grid-template-columns:1fr 100px 100px; gap:12px; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;"><span>{{ c.agent }}</span><span style="color:#5A6270;">{{ c.runs }} run</span><span style="font-family:'IBM Plex Mono',monospace; text-align:right;">{{ c.cost }}</span></div></sc-for>
+          </div>
+          <div style="color:#5A6270; font-size:13px; margin-top:10px;">Предупредување на 80% од буџетот. На 100% сетот застанува со статус „Буџет“ и чека одлука.</div>
+        </div>
+      </sc-if>
+
+      <!-- 7.9 ЕКСПОРТ -->
+      <sc-if value="{{ isSetExport }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ exportBlocked }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px 24px; max-width:560px;">
+            <div style="font-size:16px; margin-bottom:6px;">Експортот е достапен кога сите сценарија ќе бидат одобрени.</div>
+            <div style="color:#5A6270; margin-bottom:14px;">{{ approvedCountText }}</div>
+            <button onClick="{{ goSetScripts }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Кон сценаријата</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ exportReady }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start;">
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:32px 40px; font-family:'IBM Plex Mono',monospace; font-size:14px; line-height:1.7;">
+                <div style="font-size:20px; font-weight:600; margin-bottom:4px;">{{ exportTitle }}</div>
+                <div style="color:#5A6270; margin-bottom:24px;">{{ exportSub }}</div>
+                <sc-for list="{{ exportPages }}" as="p" hint-placeholder-count="3">
+                  <div style="border-top:1px solid #D9DDE3; padding:20px 0;">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;"><span style="font-size:20px; font-weight:600; letter-spacing:.02em;">{{ p.code }}</span><button onClick="{{ p.copy }}" style="height:28px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; font-family:'IBM Plex Sans',sans-serif; font-size:13px;">Копирај код</button></div>
+                    <div style="font-weight:600;">СЦЕНАРИО {{ p.nn }} — {{ p.title }}</div>
+                    <div style="color:#5A6270; font-size:13px;">{{ p.meta }}</div>
+                    <div style="color:#5A6270; font-size:13px; margin-top:6px;">{{ p.frames }} кадри · {{ p.words }} зборови изговорен текст</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <aside style="position:sticky; top:80px; display:flex; flex-direction:column; gap:12px;">
+              <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px;">
+                <div style="font-weight:500; margin-bottom:8px;">Актери и локации</div>
+                <div style="font-size:13px; color:#5A6270; display:flex; flex-direction:column; gap:4px;"><sc-for list="{{ exportPeople }}" as="e" hint-placeholder-count="3"><div><span style="color:#1B1F24;">{{ e.name }}</span> · {{ e.note }}</div></sc-for></div>
+              </div>
+              <sc-if value="{{ notExported }}" hint-placeholder-val="{{ true }}"><button onClick="{{ doExport }}" style="height:44px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; font-size:15px;">Експортирај документ</button><div style="color:#5A6270; font-size:13px;">docx + markdown, во стандардниот формат на агенцијата.</div></sc-if>
+              <sc-if value="{{ exporting }}" hint-placeholder-val="{{ false }}"><div style="color:#5A6270;">Се генерира документот</div><div style="height:3px; background:#ECEEEB; border-radius:2px; overflow:hidden;"><div style="height:100%; background:#1B1F24; width:{{ progressPct }}; transition:width .4s;"></div></div></sc-if>
+              <sc-if value="{{ isExported }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:8px;">
+                  <span style="display:flex; align-items:center; gap:8px; color:#2F7D4F; font-weight:500;"><span style="width:8px; height:8px; border-radius:50%; background:#2F7D4F;"></span>Експортирано</span>
+                  <a href="#" onClick="{{ noop }}" style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ exportFile }}.docx</a>
+                  <a href="#" onClick="{{ noop }}" style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ exportFile }}.md</a>
+                </div>
+              </sc-if>
+            </aside>
+          </div>
+        </sc-if>
+      </sc-if>
+    </sc-if>
+
+    <!-- 7.11 БАЗА -->
+    <sc-if value="{{ isBase }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:16px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Сценарија</h1>
+        <div style="color:#5A6270;">{{ baseCount }} во базата</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+        <input value="{{ baseQuery }}" onChange="{{ setBaseQuery }}" placeholder="Пребарај по код, наслов, hook или значење („хумор за рати“)" style="flex:1; min-width:280px; height:36px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">
+        <sc-for list="{{ baseFilters }}" as="f" hint-placeholder-count="4"><button onClick="{{ f.toggle }}" style="height:32px; padding:0 12px; border:1px solid {{ f.border }}; border-radius:16px; background:{{ f.bg }}; color:{{ f.color }}; font-size:13px;">{{ f.label }}</button></sc-for>
+      </div>
+      <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:140px 1.2fr 2fr 130px 90px 130px; gap:16px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Код</span><span>Наслов</span><span>Hook</span><span>Клиент</span><span>Датум</span><span>Статус</span></div>
+        <sc-for list="{{ baseRows }}" as="r" hint-placeholder-count="6">
+          <button onClick="{{ r.go }}" style="display:grid; grid-template-columns:140px 1.2fr 2fr 130px 90px 130px; gap:16px; align-items:center; width:100%; text-align:left; min-height:44px; padding:6px 16px; border:0; border-top:1px solid #D9DDE3; margin-top:-1px; background:#fff;" style-hover="background:#F8F9F7;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; display:flex; gap:6px; align-items:center;">{{ r.code }}<sc-if value="{{ r.star }}" hint-placeholder-val="{{ false }}"><span title="Ѕвезда пример" style="width:8px; height:8px; background:#1B1F24; transform:rotate(45deg); display:inline-block;"></span></sc-if></span>
+            <span style="font-weight:500;">{{ r.title }}</span>
+            <span style="color:#5A6270; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.hook }}</span>
+            <span>{{ r.client }}</span>
+            <span style="color:#5A6270; font-size:13px;">{{ r.date }}</span>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ r.statusColor }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ r.statusColor }};"></span>{{ r.statusLabel }}</div>
+          </button>
+        </sc-for>
+        <sc-if value="{{ baseEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:24px 16px; color:#5A6270;">Нема сценарија за „{{ baseQuery }}“.</div></sc-if>
+      </div>
+    </sc-if>
+
+    <!-- 7.13 РЕЗУЛТАТИ -->
+    <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Резултати</h1>
+        <div style="color:#5A6270;">Алекс Дизајн · последни 90 дена</div>
+      </div>
+      <div style="color:#5A6270; font-size:13px; margin-bottom:16px; max-width:68ch;">Перцентилот е споредба со медијаната на истиот клиент, не меѓу клиенти. Резултатите се влез за Инсајти и за примерите на Писателот.</div>
+      <sc-if value="{{ hasUnmapped }}" hint-placeholder-val="{{ false }}">
+        <section style="margin-bottom:20px;">
+          <div style="font-weight:500; margin-bottom:8px; display:flex; gap:8px; align-items:center;"><span style="width:8px; height:8px; border-radius:50%; background:#E4572E;"></span>Немапирани реклами <span style="color:#5A6270; font-weight:400; font-size:13px;">{{ unmappedCount }}</span></div>
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+            <sc-for list="{{ unmapped }}" as="u" hint-placeholder-count="2">
+              <div style="display:grid; grid-template-columns:1.4fr 1.2fr 100px 110px 240px; gap:16px; align-items:center; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ u.ad }}</span>
+                <span style="color:#5A6270; font-size:13px;">{{ u.account }}</span>
+                <span style="font-size:13px;">{{ u.spend }}</span>
+                <span style="color:#5A6270; font-size:13px;">{{ u.started }}</span>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                  <select value="{{ u.pick }}" onChange="{{ u.setPick }}" aria-label="Избери сценарио" style="height:34px; padding:0 8px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; max-width:150px;">
+                    <option value="">Избери сценарио</option>
+                    <sc-for list="{{ mapOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.code }}">{{ o.code }}</option></sc-for>
+                  </select>
+                  <button onClick="{{ u.mapIt }}" disabled="{{ u.mapDisabled }}" style="height:34px; padding:0 12px; border:0; border-radius:6px; background:#E4572E; color:#fff; font-weight:500; opacity:{{ u.mapOpacity }};">Мапирај</button>
+                  <button onClick="{{ u.notOurs }}" style="height:34px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; color:#5A6270;">Не е наше</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <sc-for list="{{ resultFilters }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.toggle }}" style="height:32px; padding:0 12px; border:1px solid {{ f.border }}; border-radius:16px; background:{{ f.bg }}; color:{{ f.color }}; font-size:13px;">{{ f.label }}</button></sc-for>
+      </div>
+      <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden; margin-bottom:20px;">
+        <div style="display:grid; grid-template-columns:130px 1.2fr 110px 100px 1fr 110px 70px 70px 90px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Код</span><span>Наслов</span><span>Објектив</span><span>Spend</span><span>Резултати</span><span>Цена / рез.</span><span>Hook</span><span>Hold</span><span>Перцентил</span></div>
+        <sc-for list="{{ adRows }}" as="a" hint-placeholder-count="5">
+          <div style="display:grid; grid-template-columns:130px 1.2fr 110px 100px 1fr 110px 70px 70px 90px; gap:14px; align-items:center; min-height:44px; padding:8px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; display:flex; gap:6px; align-items:center;">{{ a.code }}<sc-if value="{{ a.star }}" hint-placeholder-val="{{ false }}"><span title="Ѕвезда пример" style="width:8px; height:8px; background:#1B1F24; transform:rotate(45deg);"></span></sc-if></span>
+            <span style="font-weight:500;">{{ a.title }}</span>
+            <span style="color:#5A6270; font-size:13px;">{{ a.objective }}</span>
+            <span style="font-size:13px;">{{ a.spend }}</span>
+            <span style="font-size:13px;">{{ a.results }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ a.cpr }}</span>
+            <span style="font-size:13px;">{{ a.hook }}</span>
+            <span style="font-size:13px;">{{ a.hold }}</span>
+            <div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:6px; background:#ECEEEB; border-radius:3px; overflow:hidden;"><div style="height:100%; width:{{ a.pctW }}; background:{{ a.pctColor }};"></div></div><span style="font-size:13px; color:#5A6270; width:24px; text-align:right;">{{ a.pct }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:20px;">
+        <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px;">
+          <div style="padding:14px 16px; border-bottom:1px solid #D9DDE3; font-weight:500;">По аватар</div>
+          <sc-for list="{{ avatarReport }}" as="r" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:1.2fr 1fr 90px; gap:12px; align-items:center; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <span style="font-weight:{{ r.weight }};">{{ r.name }}</span>
+              <div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:8px; background:#ECEEEB; border-radius:4px; overflow:hidden;"><div style="height:100%; width:{{ r.w }}; background:{{ r.color }};"></div></div><span style="font-size:13px; color:#5A6270;">{{ r.share }}%</span></div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:right;">{{ r.cpr }}</span>
+            </div>
+          </sc-for>
+        </section>
+        <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px;">
+          <div style="padding:14px 16px; border-bottom:1px solid #D9DDE3; font-weight:500;">По тип</div>
+          <sc-for list="{{ typeReport }}" as="r" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:1.2fr 1fr 90px; gap:12px; align-items:center; padding:10px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <span style="font-weight:{{ r.weight }};">{{ r.name }}</span>
+              <div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:8px; background:#ECEEEB; border-radius:4px; overflow:hidden;"><div style="height:100%; width:{{ r.w }}; background:{{ r.color }};"></div></div><span style="font-size:13px; color:#5A6270;">{{ r.share }}%</span></div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:right;">{{ r.cpr }}</span>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- 7.12 УВОЗ -->
+    <sc-if value="{{ isImport }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:16px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Увоз</h1>
+        <div style="color:#5A6270;">Стари сценарија што биле во платени реклами</div>
+      </div>
+      <sc-if value="{{ importIdle }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; max-width:900px; margin-bottom:20px;">
+          <sc-for list="{{ importModes }}" as="m" hint-placeholder-count="3">
+            <button onClick="{{ m.pick }}" style="text-align:left; background:#fff; border:1px solid {{ m.border }}; border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:6px;" style-hover="border-color:#1B1F24;">
+              <span style="font-weight:600; font-size:16px;">{{ m.label }}</span>
+              <span style="color:#5A6270; font-size:13px;">{{ m.hint }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ importPaste }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px; max-width:900px;">
+            <textarea value="{{ importText }}" onChange="{{ setImportText }}" rows="10" placeholder="Вметни го текстот на сценариото како што е во документот" style="width:100%; padding:10px 12px; border:1px solid #D9DDE3; border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.6; resize:vertical;"></textarea>
+            <div style="display:flex; gap:12px; align-items:center; margin-top:12px;">
+              <button onClick="{{ doParse }}" disabled="{{ parseDisabled }}" style="height:40px; padding:0 18px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; opacity:{{ parseOpacity }};">Парсирај</button>
+              <button onClick="{{ fillSample }}" style="height:40px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Вметни пример</button>
+            </div>
+          </div>
+        </sc-if>
+      </sc-if>
+      <sc-if value="{{ importParsing }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:24px; max-width:560px;">
+          <div style="font-size:16px; margin-bottom:10px;">Се парсира</div>
+          <div style="height:3px; background:#ECEEEB; border-radius:2px; overflow:hidden;"><div style="height:100%; background:#1B1F24; width:{{ progressPct }}; transition:width .4s;"></div></div>
+          <div style="color:#5A6270; margin-top:10px; font-size:13px;">Се читаат кадри, режија и реплики, и се нормализираат во стандардниот формат.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ importParsed }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ importWarnings }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff; border:1px solid #B7791F; border-radius:10px; padding:14px 16px; max-width:1100px; margin-bottom:16px;">
+            <div style="display:flex; gap:8px; align-items:center; color:#B7791F; font-weight:500; margin-bottom:6px;"><span style="width:8px; height:8px; border-radius:50%; background:#B7791F;"></span>Парсирано со предупредувања</div>
+            <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="2">
+              <div style="display:grid; grid-template-columns:90px 1fr; gap:12px; font-size:13px;"><span style="color:#5A6270;">{{ w.kind }}</span><span>{{ w.text }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; margin-bottom:16px;">
+          <section>
+            <div style="font-weight:500; margin-bottom:8px;">Како го парсирав</div>
+            <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px 24px; font-family:'IBM Plex Mono',monospace; font-size:14px; line-height:1.7; display:flex; flex-direction:column; gap:20px;">
+              <sc-for list="{{ parsedFrames }}" as="f" hint-placeholder-count="3">
+                <div style="display:grid; grid-template-columns:96px 1fr; gap:14px;">
+                  <div style="color:#5A6270; font-size:13px;"><div style="font-weight:600; color:#1B1F24;">{{ f.role }}</div><div>Кадар {{ f.n }}</div></div>
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <p style="margin:0; font-style:italic; color:#5A6270;">{{ f.direction }}</p>
+                    <sc-for list="{{ f.lines }}" as="l" hint-placeholder-count="1"><p style="margin:0;"><span style="font-weight:600;">{{ l.actor }}:</span> {{ l.text }}</p></sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </article>
+          </section>
+          <section>
+            <div style="font-weight:500; margin-bottom:8px;">Оригинал</div>
+            <pre style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px 24px; font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.6; color:#5A6270; white-space:pre-wrap; margin:0;">{{ importText }}</pre>
+          </section>
+        </div>
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px; max-width:1100px; display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; align-items:end;">
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Клиент<select value="{{ impClient }}" onChange="{{ setImpClient }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ clientOptions }}" as="c" hint-placeholder-count="4"><option value="{{ c.name }}">{{ c.name }}</option></sc-for></select></label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Код<input value="{{ impCode }}" onChange="{{ setImpCode }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; padding:0 8px; font-family:'IBM Plex Mono',monospace;"></label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Тип<select value="{{ impType }}" onChange="{{ setImpType }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ typeOptions }}" as="t" hint-placeholder-count="4"><option value="{{ t.label }}">{{ t.label }}</option></sc-for></select></label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Аватар<select value="{{ impAvatar }}" onChange="{{ setImpAvatar }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ avatarOptions }}" as="a" hint-placeholder-count="5"><option value="{{ a.name }}">{{ a.name }}</option></sc-for></select></label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Актер<select value="{{ impActor }}" onChange="{{ setImpActor }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ actorOptions }}" as="a" hint-placeholder-count="2"><option value="{{ a.name }}">{{ a.name }}</option></sc-for></select></label>
+          <label style="display:flex; flex-direction:column; gap:6px; font-size:13px; color:#5A6270;">Датум на реклама<input value="{{ impDate }}" onChange="{{ setImpDate }}" style="height:36px; border:1px solid #D9DDE3; border-radius:6px; padding:0 8px;"></label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#5A6270; height:36px;"><input type="checkbox" checked="{{ impStar }}" onChange="{{ toggleImpStar }}"> Ѕвезда пример</label>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center; margin-top:16px; padding-bottom:40px;">
+          <button onClick="{{ commitImport }}" style="height:44px; padding:0 20px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; font-size:15px;">Прифати и зачувај</button>
+          <button onClick="{{ resetImport }}" style="height:44px; padding:0 16px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Откажи</button>
+          <span style="color:#5A6270; font-size:13px;">Кодот мора да е идентичен со името на рекламата во Ads Manager.</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ importSaved }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:24px; max-width:560px;">
+          <div style="display:flex; gap:8px; align-items:center; color:#2F7D4F; font-weight:500; margin-bottom:8px;"><span style="width:8px; height:8px; border-radius:50%; background:#2F7D4F;"></span>Зачувано</div>
+          <div style="margin-bottom:14px;">Сценариото <span style="font-family:'IBM Plex Mono',monospace;">{{ impCode }}</span> е во базата со статус „Увезено“.</div>
+          <div style="display:flex; gap:10px;"><button onClick="{{ resetImport }}" style="height:36px; padding:0 14px; border:0; border-radius:6px; background:#1B1F24; color:#fff;">Увези уште едно</button><button onClick="{{ goBase }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Отвори базата</button></div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- 7.14 ИЗВЕШТАИ -->
+    <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:16px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Извештаи</h1>
+        <div style="flex:1;"></div>
+        <button onClick="{{ notInProto }}" style="height:36px; padding:0 14px; border:1px solid #D9DDE3; border-radius:6px; background:#fff;">Експортирај PDF</button>
+      </div>
+      <div style="display:flex; gap:4px; border-bottom:1px solid #D9DDE3; margin-bottom:20px;">
+        <sc-for list="{{ reportTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.go }}" style="height:40px; padding:0 14px; border:0; background:transparent; font-weight:{{ t.weight }}; color:{{ t.color }}; border-bottom:2px solid {{ t.line }}; margin-bottom:-1px;">{{ t.label }}</button></sc-for>
+      </div>
+      <sc-if value="{{ reportMonthly }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden; max-width:1000px;">
+          <div style="display:grid; grid-template-columns:1.2fr 80px 90px 110px 110px 110px 130px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Месец</span><span>Сетови</span><span>Сценарија</span><span>Александар</span><span>Стефан</span><span>Трошок</span><span>API fallback</span></div>
+          <sc-for list="{{ monthly }}" as="m" hint-placeholder-count="3">
+            <div style="display:grid; grid-template-columns:1.2fr 80px 90px 110px 110px 110px 130px; gap:14px; align-items:center; min-height:44px; padding:8px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <span style="font-weight:500;">{{ m.month }}</span><span>{{ m.sets }}</span><span>{{ m.scripts }}</span><span>{{ m.aleks }} сета</span><span>{{ m.stefan }} сета</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ m.cost }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:{{ m.apiColor }};">{{ m.api }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="color:#5A6270; font-size:13px; margin-top:10px; max-width:68ch;">Трошокот е покриен од Max претплатата; колоната API fallback покажува колку излегло преку API клуч кога Max бил недостапен.</div>
+      </sc-if>
+      <sc-if value="{{ reportByClient }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden; max-width:1000px;">
+          <div style="display:grid; grid-template-columns:1.4fr 110px 110px 1fr 120px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Клиент</span><span>Сетови</span><span>Договор</span><span>Исполнување</span><span>Трошок</span></div>
+          <sc-for list="{{ clientReport }}" as="c" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:1.4fr 110px 110px 1fr 120px; gap:14px; align-items:center; min-height:44px; padding:8px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <span style="font-weight:500;">{{ c.name }}</span><span>{{ c.done }}</span><span style="color:#5A6270;">{{ c.contract }}</span>
+              <div style="height:8px; background:#ECEEEB; border-radius:4px; overflow:hidden;"><div style="height:100%; width:{{ c.w }}; background:{{ c.color }};"></div></div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ c.cost }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ reportBySet }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden; max-width:1000px;">
+          <div style="display:grid; grid-template-columns:130px 1.4fr 110px 120px 110px 130px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Код</span><span>Сет</span><span>Сценарија</span><span>Сценарист</span><span>Трошок</span><span>Статус</span></div>
+          <sc-for list="{{ setReport }}" as="s" hint-placeholder-count="3">
+            <div style="display:grid; grid-template-columns:130px 1.4fr 110px 120px 110px 130px; gap:14px; align-items:center; min-height:44px; padding:8px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ s.code }}</span><span style="font-weight:500;">{{ s.name }}</span><span>{{ s.requested }}</span><span style="color:#5A6270;">{{ s.writer }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ s.cost }}</span>
+              <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:{{ s.statusColor }};"><span style="width:8px; height:8px; border-radius:50%; background:{{ s.statusColor }};"></span>{{ s.statusLabel }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <!-- 7.14 ПОСТАВКИ -->
+    <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:16px;">
+        <h1 style="font-size:28px; font-weight:600; margin:0; line-height:1.2;">Поставки</h1>
+        <div style="color:#5A6270;">Само Admin</div>
+      </div>
+      <div style="display:flex; gap:20px; align-items:start; flex-wrap:wrap;">
+        <div style="flex:1 1 190px; max-width:220px; display:flex; flex-direction:column; gap:2px;">
+          <sc-for list="{{ settingsTabs }}" as="t" hint-placeholder-count="6"><button onClick="{{ t.go }}" style="text-align:left; height:36px; padding:0 12px; border:0; border-radius:6px; background:{{ t.bg }}; font-weight:{{ t.weight }};" style-hover="background:#ECEEEB;">{{ t.label }}</button></sc-for>
+        </div>
+        <div style="flex:100 1 520px; min-width:0;">
+          <sc-if value="{{ setTemplates }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+              <sc-for list="{{ templateTabs }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.go }}" style="height:32px; padding:0 12px; border:1px solid {{ t.border }}; border-radius:16px; background:{{ t.bg }}; color:{{ t.color }}; font-size:13px;">{{ t.label }}</button></sc-for>
+            </div>
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px;">
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                <span style="font-weight:600;">{{ template.kind }}</span>
+                <span style="color:#5A6270; font-size:13px;">верзија {{ template.version }} · ажурирана {{ template.updated }}</span>
+                <div style="flex:1;"></div>
+                <button onClick="{{ notInProto }}" style="height:32px; padding:0 12px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; font-size:13px;">Историја</button>
+              </div>
+              <textarea value="{{ templateText }}" onChange="{{ setTemplateText }}" rows="14" style="width:100%; padding:12px; border:1px solid #D9DDE3; border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.65; resize:vertical;"></textarea>
+              <div style="display:flex; gap:10px; align-items:center; margin-top:12px;">
+                <button onClick="{{ saveTemplate }}" disabled="{{ templateClean }}" style="height:38px; padding:0 16px; border:0; border-radius:6px; background:#1B1F24; color:#fff; font-weight:500; opacity:{{ templateOpacity }};">Зачувај верзија {{ templateNextV }}</button>
+                <span style="color:#5A6270; font-size:13px;">{{ templateHint }}</span>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ setRubric }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+              <div style="display:grid; grid-template-columns:1fr 90px 70px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Критериум</span><span>Мин. оценка</span><span>Активен</span></div>
+              <sc-for list="{{ rubricRows }}" as="r" hint-placeholder-count="11">
+                <div style="display:grid; grid-template-columns:1fr 90px 70px; gap:14px; align-items:center; min-height:44px; padding:6px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                  <input defaultValue="{{ r.name }}" aria-label="Критериум" style="border:1px solid transparent; border-radius:4px; padding:4px 6px; background:transparent; width:100%;" style-hover="border-color:#D9DDE3;" style-focus="border-color:#1B1F24;">
+                  <select defaultValue="3" aria-label="Минимална оценка" style="height:30px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 6px;"><option>2</option><option>3</option><option>4</option></select>
+                  <input type="checkbox" defaultChecked="{{ true }}" aria-label="Активен">
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex; gap:16px; align-items:center; margin-top:12px;"><button onClick="{{ notInProto }}" style="height:36px; padding:0 14px; border:1px dashed #D9DDE3; border-radius:6px; background:transparent; color:#5A6270;">+ нов критериум</button><span style="color:#5A6270; font-size:13px;">Праг за поминување: сите критериуми над минимумот и вкупно ≥ 80%.</span></div>
+          </sc-if>
+          <sc-if value="{{ setBanned }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <sc-for list="{{ banned }}" as="b" hint-placeholder-count="2">
+                <section style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px;">
+                  <div style="font-weight:500; margin-bottom:10px;">Забранети фрази · {{ b.lang }}</div>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <sc-for list="{{ b.items }}" as="p" hint-placeholder-count="4">
+                      <span style="display:inline-flex; align-items:center; gap:8px; height:30px; padding:0 10px; border:1px solid #D9DDE3; border-radius:15px; font-size:13px;">{{ p.text }}<button onClick="{{ p.remove }}" aria-label="Отстрани" style="border:0; background:transparent; color:#5A6270; padding:0;">×</button></span>
+                    </sc-for>
+                    <button onClick="{{ notInProto }}" style="height:30px; padding:0 10px; border:1px dashed #D9DDE3; border-radius:15px; background:transparent; color:#5A6270; font-size:13px;">+ фраза</button>
+                  </div>
+                </section>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ setRouting }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+              <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr 110px; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Агент</span><span>Модел</span><span>Fallback</span><span>Буџет / run</span></div>
+              <sc-for list="{{ routing }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr 110px; gap:14px; align-items:center; min-height:44px; padding:6px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                  <span style="font-weight:500;">{{ r.agent }}</span>
+                  <select defaultValue="{{ r.model }}" aria-label="Модел" style="height:32px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ modelOptions }}" as="m" hint-placeholder-count="4"><option value="{{ m.name }}">{{ m.name }}</option></sc-for></select>
+                  <select defaultValue="{{ r.fallback }}" aria-label="Fallback" style="height:32px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><sc-for list="{{ modelOptions }}" as="m" hint-placeholder-count="4"><option value="{{ m.name }}">{{ m.name }}</option></sc-for></select>
+                  <input defaultValue="{{ r.budget }}" aria-label="Буџет" style="height:32px; border:1px solid #D9DDE3; border-radius:6px; padding:0 8px; font-family:'IBM Plex Mono',monospace; font-size:13px;">
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:16px; margin-top:16px; display:grid; grid-template-columns:200px 1fr; gap:12px 16px; align-items:center;">
+              <span style="color:#5A6270;">Автентикација</span><span>Claude Max претплата, со автоматски fallback на API клуч и нотификација до Admin.</span>
+              <span style="color:#5A6270;">Буџет по клиент</span><div><input defaultValue="$50" style="height:32px; width:100px; border:1px solid #D9DDE3; border-radius:6px; padding:0 8px; font-family:'IBM Plex Mono',monospace;"> <span style="color:#5A6270; font-size:13px;">месечно · предупредување на 80%</span></div>
+              <span style="color:#5A6270;">Буџет по сет</span><div><input defaultValue="$8" style="height:32px; width:100px; border:1px solid #D9DDE3; border-radius:6px; padding:0 8px; font-family:'IBM Plex Mono',monospace;"> <span style="color:#5A6270; font-size:13px;">на 100% сетот застанува со BUDGET_HOLD</span></div>
+              <span style="color:#5A6270;">Meta token</span><div style="display:flex; gap:10px; align-items:center;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ metaToken }}</span><button onClick="{{ toggleToken }}" style="height:30px; padding:0 10px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; font-size:13px;">{{ tokenLabel }}</button></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ setUsers }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; overflow:hidden;">
+              <div style="display:grid; grid-template-columns:1fr 1.4fr 120px 1fr; gap:14px; padding:10px 16px; color:#5A6270; font-size:13px; border-bottom:1px solid #D9DDE3;"><span>Име</span><span>Email</span><span>Улога</span><span>Нотификации</span></div>
+              <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
+                <div style="display:grid; grid-template-columns:1fr 1.4fr 120px 1fr; gap:14px; align-items:center; min-height:44px; padding:6px 16px; border-top:1px solid #D9DDE3; margin-top:-1px;">
+                  <span style="font-weight:500;">{{ u.name }}</span>
+                  <span style="color:#5A6270; font-family:'IBM Plex Mono',monospace; font-size:13px;">{{ u.email }}</span>
+                  <select defaultValue="{{ u.role }}" aria-label="Улога" style="height:32px; border:1px solid #D9DDE3; border-radius:6px; background:#fff; padding:0 8px;"><option>Сценарист</option><option>Admin</option><option>Viewer</option></select>
+                  <span style="color:#5A6270; font-size:13px;">{{ u.notif }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex; gap:16px; align-items:center; margin-top:12px;"><button onClick="{{ notInProto }}" style="height:36px; padding:0 14px; border:1px dashed #D9DDE3; border-radius:6px; background:transparent; color:#5A6270;">+ нов корисник</button><span style="color:#5A6270; font-size:13px;">Настани за нотификација: концепти спремни, сценарија спремни, не поминало критика, предлог чека потврда, буџет 80/100%, грешка.</span></div>
+          </sc-if>
+          <sc-if value="{{ setFormat }}" hint-placeholder-val="{{ false }}">
+            <article style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:20px 24px;">
+              <div style="font-weight:500; margin-bottom:10px;">Формат на сценарио</div>
+              <pre style="font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.7; margin:0 0 14px; white-space:pre-wrap; color:#1B1F24;">СЦЕНАРИО {NN} — {Наслов} ({Тип} · {Аватар} · {Актер} · {Локација} · ~{сек}s)
+Код: {CLIENT_CODE}-{YYMM}-{NN}
+
+КАДАР 1 — ХООК
+{Режија: каде е актерот, што држи, како гледа.}
+{Актер}: „{реплика}“
+
+КАДАР 2 — БОДИ
+{Режија}
+{Актер}: „{реплика}“
+(Монтажа: {текст на екран, графика, инсерти} — само ако има)
+
+КАДАР Z — ЦТА
+{Режија: лого, кадри од салон/продукт}
+{Актер}: „{реплика со конкретна акција}“</pre>
+              <div style="color:#5A6270; font-size:13px; max-width:68ch;">Сите генерирани и увезени сценарија се нормализираат во овој формат. Улогата на кадарот е задолжителна, режијата е одвоена од репликата, репликата секогаш носи име на актер, а бројки што се појавуваат на екран одат и во табела.</div>
+            </article>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- Останати -->
+    <sc-if value="{{ isOther }}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:28px; font-weight:600; margin:0 0 16px; line-height:1.2;">{{ otherTitle }}</h1>
+      <div style="background:#fff; border:1px solid #D9DDE3; border-radius:10px; padding:40px 24px; max-width:560px;">
+        <div style="font-size:16px; margin-bottom:6px;">{{ otherText }}</div>
+        <div style="color:#5A6270;">{{ otherSub }}</div>
+      </div>
+    </sc-if>
+
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1B1F24; color:#fff; padding:10px 16px; border-radius:6px; box-shadow:0 8px 24px rgba(27,31,36,.2); font-size:14px; z-index:50;">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;inbox&quot;,&quot;options&quot;:[&quot;inbox&quot;,&quot;clients&quot;,&quot;set&quot;,&quot;brief&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Прототип&quot;},&quot;contextOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Сценарија&quot;},&quot;agentSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.3,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Прототип&quot;}}">
+class Component extends DCLogic {
+  state = {
+    D:null, screen:'inbox', clientId:'aleks', clientTab:'overview', brainTab:'profile', setId:'set-2609', setTab:'scripts', scriptId:'s2',
+    ctxOpen:true, ctxTab:'critic', editing:false, returning:false, comment:'', onlyMine:false, toast:'', pulse:false, search:'',
+    sets:[], scripts:[], concepts:[], proposals:[], inboxExtra:[], progress:0, phase:'', writingDone:0, exporting:false, moreGen:false,
+    conceptComment:'', commentingId:null, highlightFrame:null, baseQuery:'', baseFilter:'', runTab:0,
+    brief:{n:4,types:[],product:'Кујна по мерка — основен модул',offer:'',avatars:['elena','marija'],actors:['ajtov','jule'],locations:['salon','dnevna'],notes:'',insp:'',inspMode:'rework',cons:'',sec:'30'},
+  };
+  timers=[];
+  componentDidMount(){
+    import('./data.js').then(D=>{
+      const sc=this.props.startScreen??'inbox';
+      this.setState({D, sets:D.SETS.map(s=>({...s})), scripts:D.SCRIPTS.map(s=>({...s})), proposals:D.COMPETITOR_PROPOSALS.slice(), screen:sc, ctxOpen:this.props.contextOpen??true});
+    });
+  }
+  componentDidUpdate(prev){
+    if(prev.startScreen!==this.props.startScreen&&this.props.startScreen) this.setState({screen:this.props.startScreen});
+    if(prev.contextOpen!==this.props.contextOpen) this.setState({ctxOpen:this.props.contextOpen??true});
+  }
+  spd(ms){ return ms/(this.props.agentSpeed??1); }
+  componentWillUnmount(){ this.timers.forEach(clearTimeout); }
+  later(ms,fn){ const t=setTimeout(fn,ms); this.timers.push(t); return t; }
+  toast(msg){ this.setState({toast:msg}); this.later(2600,()=>this.setState(s=>s.toast===msg?{toast:''}:null)); }
+  go(patch){ this.setState({editing:false,returning:false,comment:'',search:'',...patch}); window.scrollTo(0,0); }
+  runProgress(total,done){
+    total=this.spd(total);
+    this.setState({progress:0});
+    const start=Date.now();
+    const tick=()=>{ const p=Math.min(1,(Date.now()-start)/total); this.setState({progress:p}); if(p<1) this.later(120,tick); else done(); };
+    tick();
+  }
+  pulseOnce(){ this.setState({pulse:true}); this.later(900,()=>this.setState({pulse:false})); }
+
+  renderVals(){
+    const {D}=this.state; if(!D) return {};
+    const {C,STATUS,TYPES,CLIENTS,AVATARS,PRODUCTS,ACTORS,LOCATIONS,COMPETITORS,REFERENCES,GLOSSARY,WHATS_NEW,PROFILE_DOC,RUBRIC,BASE_ROWS,TRANSCRIPT,COSTS}=D;
+    const s=this.state;
+    const st=k=>STATUS[k]||{label:k,c:C.ink2};
+    const client=CLIENTS.find(c=>c.id===s.clientId)||CLIENTS[0];
+    const set=s.sets.find(x=>x.id===s.setId)||s.sets[0]||{};
+    const setScripts=s.scripts.filter(x=>x.setId===set.id);
+    const script=setScripts.find(x=>x.id===s.scriptId)||setScripts[0]||null;
+    const av=id=>AVATARS.find(a=>a.id===id)||AVATARS[0];
+    const ac=id=>ACTORS.find(a=>a.id===id)||ACTORS[0];
+    const lo=id=>LOCATIONS.find(a=>a.id===id)||LOCATIONS[0];
+    const bars=arr=>arr.map(v=>({color:v?C.ink:C.rule}));
+    const waitingScripts=s.scripts.filter(x=>x.status==='wait'||x.status==='failed');
+    const conceptSets=s.sets.filter(x=>x.status==='conceptsWait');
+    const inboxCount=(waitingScripts.length?1:0)+conceptSets.length+3;
+
+    // Inbox
+    const mine='Александар';
+    let items=[];
+    if(waitingScripts.length) items.push({group:'Сценарија за одобрување',client:'Алекс Дизајн',logo:client.logo,set:'Роденден 20 години — септември · ALEKS-2609',what:waitingScripts.length+' сценарија за одобрување',age:'3 ч',writer:'Александар',go:()=>this.go({screen:'set',clientId:'aleks',setId:'set-2609',setTab:'scripts',scriptId:waitingScripts[0].id})});
+    conceptSets.forEach(cs=>items.push({group:'Концепти за избор',client:'Алекс Дизајн',logo:client.logo,set:cs.name+' · '+cs.code,what:s.concepts.length+' концепти за избор',age:'сега',writer:'Александар',go:()=>this.go({screen:'set',clientId:'aleks',setId:cs.id,setTab:'concepts'})}));
+    items.push({group:'Концепти за избор',client:'Дента Про',letter:'Д',set:'Белеење септември · DENTA-2609',what:'8 концепти за избор',age:'1 д',writer:'Стефан',go:()=>this.toast('Во прототипот е отворен само клиентот Алекс Дизајн')});
+    items.push({group:'Предлози за потврда',client:'Фитнес Зона',letter:'Ф',set:'Мозок · Аватари',what:'Нов аватар „Марко, 27 — почетник“',age:'2 д',writer:'Александар',go:()=>this.toast('Во прототипот е отворен само клиентот Алекс Дизајн')});
+    if(s.proposals.length) items.push({group:'Предлози за потврда',client:'Алекс Дизајн',logo:client.logo,set:'Мозок · Конкуренти',what:'Нов конкурент „Форма Идеале“',age:'2 д',writer:'Александар',go:()=>this.go({screen:'client',clientTab:'brain',brainTab:'competitors'})});
+    items.push({group:'Буџет',client:'Автосервис Марко',letter:'А',set:'Есенски сервис · MARKO-2609',what:'Сетот е на 80% од буџетот',age:'5 ч',writer:'Стефан',go:()=>this.toast('Во прототипот е отворен само клиентот Алекс Дизајн')});
+    if(s.onlyMine) items=items.filter(i=>i.writer===mine);
+    const order=['Концепти за избор','Сценарија за одобрување','Предлози за потврда','Буџет'];
+    const inboxGroups=order.map(t=>({title:t,items:items.filter(i=>i.group===t)})).filter(g=>g.items.length).map(g=>({...g,count:g.items.length}));
+    const badge=items.length;
+
+    const navDefs=[['inbox','Чека тебе','4px'],['clients','Клиенти','50%'],['base','Сценарија','2px'],['results','Резултати','2px'],['import','Увоз','2px'],['reports','Извештаи','2px'],['settings','Поставки','50%']];
+    const navItems=navDefs.map(([k,label,r])=>{const cur=s.screen===k||(k==='clients'&&['client','brief','set'].includes(s.screen));return{label,iconRadius:r,current:cur?'page':undefined,bg:cur?'#E6E8E4':'transparent',weight:cur?600:400,badge:k==='inbox'?badge:0,go:()=>this.go({screen:k})};});
+
+    // tabs
+    const tab=(label,on,go,extra={})=>({label,go,weight:on?600:400,color:on?C.ink:C.ink2,line:on?C.ink:'transparent',bg:on?'#E6E8E4':'transparent',...extra});
+    const clientTabs=[['overview','Преглед'],['brain','Мозок на клиентот'],['sets','Сетови']].map(([k,l])=>tab(l,s.clientTab===k,()=>this.go({screen:'client',clientTab:k})));
+    const brainTabs=[['profile','Профил'],['avatars','Аватари'],['products','Продукти'],['actors','Актери'],['locations','Локации'],['competitors','Конкуренти'],['references','Референци'],['glossary','Речник'],['insights','Инсајти']].map(([k,l])=>tab(l,s.brainTab===k,()=>this.setState({brainTab:k})));
+    const setTabDefs=[['brief','Бриф'],['concepts','Концепти'],['scripts','Сценарија'],['transcripts','Транскрипти'],['cost','Трошок'],['export','Експорт']];
+    const setTabs=setTabDefs.map(([k,l])=>tab(l,s.setTab===k,()=>this.go({screen:'set',setTab:k}),{dot:(k==='concepts'&&set.status==='conceptsWait')||(k==='scripts'&&setScripts.some(x=>x.status==='wait'||x.status==='failed'))}));
+
+    const setRows=s.sets.filter(x=>x.clientId===client.id).map(x=>({...x,statusLabel:st(x.status).label,statusColor:st(x.status).c,go:()=>this.go({screen:'set',setId:x.id,setTab:x.status==='concepts'||x.status==='conceptsWait'?'concepts':'scripts',scriptId:(s.scripts.find(sc=>sc.setId===x.id)||{}).id})}));
+
+    const avatarRows=AVATARS.map(a=>({...a,bars:bars(a.coverage),lastColor:a.coverage.every(v=>!v)?C.hold:C.ink2,last:a.coverage.every(v=>!v)?'непокриен 3+ сета':a.last}));
+    const avatarCards=AVATARS.map(a=>({...a,bars:bars(a.coverage),statusLabel:st(a.status).label,statusColor:st(a.status).c}));
+
+    // brief
+    const b=s.brief;
+    const tog=(key,id)=>()=>this.setState(p=>{const arr=p.brief[key];return{brief:{...p.brief,[key]:arr.includes(id)?arr.filter(x=>x!==id):[...arr,id]}};});
+    const chip=(on)=>({on,border:on?C.ink:C.rule,bg:on?C.ink:'#fff',color:on?'#fff':C.ink});
+    const box=(on)=>({on,border:on?C.ink:C.rule,bg:on?'#F5F6F4':'#fff',boxBorder:on?C.ink:C.ink2,boxBg:on?C.ink:'#fff',checkOpacity:on?1:0});
+    const typeChips=[...Object.entries(TYPES).map(([k,l])=>({label:l,...chip(b.types.includes(k)),toggle:tog('types',k)})),{label:'Одлучи ти',...chip(b.types.length===0),toggle:()=>this.setState(p=>({brief:{...p.brief,types:[]}}))}];
+    const briefAvatars=AVATARS.map(a=>({...a,bars:bars(a.coverage),suggested:a.id==='elena'||a.id==='marija',...box(b.avatars.includes(a.id)),toggle:tog('avatars',a.id)}));
+    const briefActors=ACTORS.map(a=>({...a,...box(b.actors.includes(a.id)),toggle:tog('actors',a.id)}));
+    const briefLocations=LOCATIONS.map(l=>({...l,...box(b.locations.includes(l.id)),toggle:tog('locations',l.id)}));
+    const setB=(k)=>e=>this.setState(p=>({brief:{...p.brief,[k]:e.target.value}}));
+
+    // concepts
+    const conceptCards=s.concepts.map(c=>{const sel=c.decision==='SELECTED',rej=c.decision==='REJECTED';return{...c,typeLabel:TYPES[c.type],avatarName:av(c.avatar).name,actorName:ac(c.actor).name,locationName:lo(c.location).name,
+      border:sel?C.ink:C.rule,opacity:rej?.45:1,selLabel:sel?'Избрано':'Избери',selBorder:sel?C.ink:C.rule,selBg:sel?C.ink:'#fff',selColor:sel?'#fff':C.ink,rejLabel:rej?'Врати':'Отфрли',commenting:s.commentingId===c.id,
+      select:()=>this.setState(p=>({concepts:p.concepts.map(x=>x.id===c.id?{...x,decision:sel?'PENDING':'SELECTED'}:x)})),
+      reject:()=>this.setState(p=>({concepts:p.concepts.map(x=>x.id===c.id?{...x,decision:rej?'PENDING':'REJECTED'}:x)})),
+      startComment:()=>this.setState({commentingId:c.id,conceptComment:c.comment||''}),
+      saveComment:()=>this.setState(p=>({commentingId:null,concepts:p.concepts.map(x=>x.id===c.id?{...x,comment:p.conceptComment}:x)})),
+      cycleAvatar:()=>this.setState(p=>({concepts:p.concepts.map(x=>{if(x.id!==c.id)return x;const i=AVATARS.findIndex(a=>a.id===x.avatar);return{...x,avatar:AVATARS[(i+1)%AVATARS.length].id,suggested:false};})})),
+    };});
+    const selectedCount=s.concepts.filter(c=>c.decision==='SELECTED').length;
+    const writeDisabled=selectedCount===0||s.phase==='writing';
+
+    // scripts
+    const scriptList=setScripts.map((x,i)=>({...x,nn:String(i+1).padStart(2,'0'),current:x.id===(script||{}).id?'true':undefined,border:x.id===(script||{}).id?C.rule:'transparent',bg:x.id===(script||{}).id?'#fff':'transparent',statusLabel:st(x.status).label,statusColor:st(x.status).c,go:()=>this.go({scriptId:x.id,highlightFrame:null})}));
+    const nn=script?String(setScripts.indexOf(script)+1).padStart(2,'0'):'';
+    const frames=(script?script.frames:[]).map(f=>({...f,anchor:'frame-'+f.n,lines:f.lines.map((l,i)=>({...l,key:'l'+i})),bg:s.highlightFrame===f.n?'#FBE9E3':'transparent',tableHead:f.table?f.table.head.map(t=>({t})):[],tableRows:f.table?f.table.rows.map(r=>({cells:r.map(t=>({t}))})):[]}));
+    const scores=script?script.scores||[]:[];
+    const total=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/(scores.length*5)*100):0;
+    const passed=scores.every(v=>v>=3)&&total>=80;
+    const criteria=RUBRIC.map((name,i)=>{const sc=scores[i]||0;const low=sc<3;return{name,score:sc,color:low?C.hold:C.ink,pips:[1,2,3,4,5].map(p=>({color:p<=sc?(low?C.hold:C.ink):C.rule}))};});
+    const findings=(script?script.findings||[]:[]).map(f=>({...f,jump:()=>{this.setState({highlightFrame:f.frame});const el=document.getElementById('frame-'+f.frame);if(el){const y=el.getBoundingClientRect().top+window.scrollY-90;window.scrollTo(0,y);}this.later(1600,()=>this.setState({highlightFrame:null}));}}));
+    const readable=script&&!['writing','critic','revising'].includes(script.status);
+    const allApproved=setScripts.length>0&&setScripts.every(x=>x.status==='ok'||x.status==='live'||x.status==='learned'||x.status==='exported');
+    const approvedCount=setScripts.filter(x=>x.status==='ok').length;
+    const writingScripts=setScripts.filter(x=>['writing','critic','revising'].includes(x.status));
+    const writingLine=s.phase==='writing'?`Се пишуваат ${setScripts.length} · ${setScripts.length-writingScripts.length} готови`:'';
+    const ctxTabs=[['critic','Критика'],['context','Контекст']].map(([k,l])=>tab(l,s.ctxTab===k,()=>this.setState({ctxTab:k})));
+
+    // export
+    const words=fr=>fr.reduce((a,f)=>a+f.lines.reduce((x,l)=>x+l.text.split(/\s+/).length,0),0);
+    const exportPages=setScripts.map((x,i)=>({code:x.code,nn:String(i+1).padStart(2,'0'),title:x.title,meta:`${TYPES[x.type]} · ${av(x.avatar).name} · ${ac(x.actor).name} · ${lo(x.location).name} · ~${x.sec}s`,frames:x.frames.length,words:words(x.frames),copy:()=>{try{navigator.clipboard.writeText(x.code);}catch(e){}this.toast('Кодот '+x.code+' е копиран');}}));
+    const people=[...new Set(setScripts.map(x=>x.actor))].map(id=>({name:ac(id).name,note:setScripts.filter(x=>x.actor===id).map(x=>x.code.slice(-2)).join(', ')})).concat([...new Set(setScripts.map(x=>x.location))].map(id=>({name:lo(id).name,note:setScripts.filter(x=>x.location===id).map(x=>x.code.slice(-2)).join(', ')})));
+    const monthName=set.code&&set.code.endsWith('09')?'Септември':set.code&&set.code.endsWith('08')?'Август':'Јули';
+    const exportFile=`Алекс Дизајн ${monthName} 2026 Сценарија`;
+
+    // base
+    const allBase=[...s.scripts.map(x=>({code:x.code,title:x.title,hook:x.frames[0].lines[0].text,client:'Алекс Дизајн',date:x.setId==='set-2609'?'02.09.2026':'12.08.2026',status:x.status,type:x.type,actor:ac(x.actor).name,star:!!x.star,id:x.id,setId:x.setId})),...BASE_ROWS];
+    const q=s.baseQuery.trim().toLowerCase();
+    const sem={'хумор':'SKETCH','рати':'рат','цени':'цен','кујн':'кујн'};
+    const baseRows=allBase.filter(r=>!s.baseFilter||r.type===s.baseFilter||(s.baseFilter==='star'&&r.star)).filter(r=>!q||[r.code,r.title,r.hook,r.client,r.actor,TYPES[r.type]].join(' ').toLowerCase().includes(q)||Object.entries(sem).some(([k,v])=>q.includes(k)&&(r.type===v||(r.hook+r.title).toLowerCase().includes(v))))
+      .map(r=>({...r,statusLabel:st(r.status).label,statusColor:st(r.status).c,go:()=>r.id?this.go({screen:'set',setId:r.setId,setTab:'scripts',scriptId:r.id}):this.toast('Во прототипот се отвораат само сценаријата на Алекс Дизајн')}));
+    const baseFilters=[['PRODUCT_OFFER','Продажно'],['EDUCATIONAL','Едукативно'],['TESTIMONIAL','Тестимонијал'],['SKETCH','Скеч'],['star','Ѕвезда']].map(([k,l])=>({label:l,...chip(s.baseFilter===k),toggle:()=>this.setState(p=>({baseFilter:p.baseFilter===k?'':k}))}));
+
+    // search
+    const sq=s.search.trim().toLowerCase();
+    const searchResults=sq?allBase.filter(r=>[r.code,r.title,r.hook,r.client].join(' ').toLowerCase().includes(sq)).slice(0,6).map(r=>({...r,go:()=>r.id?this.go({screen:'set',setId:r.setId,setTab:'scripts',scriptId:r.id}):this.toast('Во прототипот се отвораат само сценаријата на Алекс Дизајн')})):[];
+    const clientHits=sq?CLIENTS.filter(c=>c.name.toLowerCase().includes(sq)).map(c=>({code:c.code,title:c.name,client:'клиент',go:()=>c.id==='aleks'?this.go({screen:'client',clientTab:'overview'}):this.toast('Во прототипот е отворен само клиентот Алекс Дизајн')})):[];
+
+    const other=['','',''];
+    // Резултати (Ф2)
+    const {ADS,UNMAPPED,AVATAR_REPORT,TYPE_REPORT,IMPORT_PARSED,TEMPLATES,BANNED,ROUTING,USERS,MONTHLY}=D;
+    const resFilter=s.resFilter||'';
+    const sortedAds=[...ADS].sort((a,b)=>b.pct-a.pct);
+    const shownAds=resFilter==='top'?sortedAds.slice(0,3):resFilter==='bottom'?sortedAds.slice(-2):sortedAds;
+    const adRows=shownAds.map(a=>({...a,pctW:a.pct+'%',pctColor:a.pct>=70?C.ok:a.pct>=40?C.ink2:C.hold}));
+    const resultFilters=[['','Сите'],['top','Топ'],['bottom','Дно']].map(([k,l])=>({label:l,...chip(resFilter===k),toggle:()=>this.setState({resFilter:k})}));
+    const unmappedList=(s.unmapped||UNMAPPED).map(u=>({...u,pick:s.mapPick&&s.mapPick[u.ad]||'',mapDisabled:!(s.mapPick&&s.mapPick[u.ad]),mapOpacity:(s.mapPick&&s.mapPick[u.ad])?1:.5,
+      setPick:e=>this.setState(p=>({mapPick:{...(p.mapPick||{}),[u.ad]:e.target.value}})),
+      mapIt:()=>{const code=s.mapPick[u.ad];this.setState(p=>({unmapped:(p.unmapped||UNMAPPED).filter(x=>x.ad!==u.ad)}));this.toast('Мапирано на '+code);},
+      notOurs:()=>{this.setState(p=>({unmapped:(p.unmapped||UNMAPPED).filter(x=>x.ad!==u.ad)}));this.toast('Означено како „не е наше“');}}));
+    const bar=(share,best)=>({w:share+'%',color:best?C.ok:C.ink,weight:best?600:400});
+
+    // Увоз
+    const impMode=s.impMode||'', impStage=s.impStage||'idle';
+    const importModes=[['paste','Вметни текст','Copy-paste од документ или порака'],['docx','Качи docx','Стандарден документ со сценарија'],['bulk','Повеќе фајлови','Цела папка по клиент, еден по еден за преглед']].map(([k,label,hint])=>({label,hint,border:impMode===k?C.ink:C.rule,pick:()=>k==='paste'?this.setState({impMode:'paste'}):this.toast('Во прототипот работи вметнување текст')}));
+    const parsedFrames=(s.parsedFrames||[]).map(f=>({...f}));
+
+    // Поставки
+    const stab=s.setTab2||'templates';
+    const settingsTabs=[['templates','Темплејти на агенти'],['rubric','Рубрика на Критичарот'],['banned','Забранети фрази'],['format','Формат на сценарио'],['routing','Модели и буџети'],['users','Корисници и улоги']].map(([k,l])=>tab(l,stab===k,()=>this.setState({setTab2:k})));
+    const tIdx=s.tplIdx||0, template=TEMPLATES[tIdx];
+    const templateTabs=TEMPLATES.map((t,i)=>({label:t.kind,...chip(tIdx===i),go:()=>this.setState({tplIdx:i,tplText:null})}));
+    const tplText=s.tplText==null?template.content:s.tplText;
+    const banned=(s.banned||BANNED).map(b=>({lang:b.lang,items:b.phrases.map(p=>({text:p,remove:()=>{this.setState(q=>({banned:(q.banned||BANNED).map(x=>x.lang===b.lang?{...x,phrases:x.phrases.filter(y=>y!==p)}:x)}));this.toast('Отстрането');}}))}));
+
+    // Извештаи
+    const rtab=s.repTab||'monthly';
+    const reportTabs=[['monthly','Месечно'],['client','По клиент'],['set','По сет']].map(([k,l])=>tab(l,rtab===k,()=>this.setState({repTab:k})));
+    const clientReport=CLIENTS.map(c=>{const [d,t]=c.setsMonth.split(' од ').map(Number);return{name:c.name,done:c.setsMonth,contract:c.contract.split(' ').slice(0,3).join(' '),w:Math.round(d/t*100)+'%',color:d/t>=.5?C.ok:C.hold,cost:c.budget.split(' од ')[0]};});
+    const setReport=s.sets.map(x=>({...x,statusLabel:st(x.status).label,statusColor:st(x.status).c}));
+    const pct=Math.round(s.progress*100)+'%';
+
+    return {
+      navItems, pulseAnim:s.pulse?'gs-pulse .8s ease-out 1':'none', search:s.search, setSearch:e=>this.setState({search:e.target.value}), searchOpen:!!sq, searchResults:[...clientHits,...searchResults], searchEmpty:sq&&!searchResults.length&&!clientHits.length,
+      goBrief:()=>this.go({screen:'brief'}), goClients:()=>this.go({screen:'clients'}), goClient:()=>this.go({screen:'client',clientTab:'overview'}),
+      notInProto:()=>this.toast('Не е дел од овој прототип'), noop:e=>e.preventDefault(),
+      isInbox:s.screen==='inbox', isClients:s.screen==='clients', isClient:s.screen==='client', isBrief:s.screen==='brief', isSet:s.screen==='set', isBase:s.screen==='base',
+      isResults:s.screen==='results', isImport:s.screen==='import', isReports:s.screen==='reports', isSettings:s.screen==='settings', isOther:false,
+      // Резултати
+      adRows, resultFilters, unmapped:unmappedList, unmappedCount:unmappedList.length, hasUnmapped:unmappedList.length>0,
+      mapOptions:s.scripts.map(x=>({code:x.code})),
+      avatarReport:AVATAR_REPORT.map(r=>({...r,...bar(r.share,r.best)})), typeReport:TYPE_REPORT.map(r=>({...r,...bar(r.share,r.best)})),
+      // Увоз
+      importModes, importIdle:impStage==='idle', importPaste:impMode==='paste', importParsing:impStage==='parsing', importParsed:impStage==='parsed', importSaved:impStage==='saved',
+      importText:s.impText||'', setImportText:e=>this.setState({impText:e.target.value}),
+      fillSample:()=>this.setState({impText:IMPORT_PARSED.original}),
+      parseDisabled:!(s.impText||'').trim(), parseOpacity:(s.impText||'').trim()?1:.5,
+      doParse:()=>this.doParse(), parsedFrames, warnings:IMPORT_PARSED.warnings, importWarnings:impStage==='parsed',
+      impClient:s.impClient||'Алекс Дизајн', setImpClient:e=>this.setState({impClient:e.target.value}),
+      impCode:s.impCode||'ALEKS-2608-01', setImpCode:e=>this.setState({impCode:e.target.value}),
+      impType:s.impType||'Скеч', setImpType:e=>this.setState({impType:e.target.value}),
+      impAvatar:s.impAvatar||'Марија, 34', setImpAvatar:e=>this.setState({impAvatar:e.target.value}),
+      impActor:s.impActor||'Ајтов', setImpActor:e=>this.setState({impActor:e.target.value}),
+      impDate:s.impDate||'12.08.2026', setImpDate:e=>this.setState({impDate:e.target.value}),
+      impStar:!!s.impStar, toggleImpStar:()=>this.setState(p=>({impStar:!p.impStar})),
+      clientOptions:CLIENTS, typeOptions:Object.values(TYPES).map(label=>({label})), avatarOptions:AVATARS, actorOptions:ACTORS,
+      commitImport:()=>{this.setState({impStage:'saved'});this.toast('Зачувано');}, resetImport:()=>this.setState({impStage:'idle',impMode:'',impText:''}),
+      goBase:()=>this.go({screen:'base'}),
+      // Извештаи
+      reportTabs, reportMonthly:rtab==='monthly', reportByClient:rtab==='client', reportBySet:rtab==='set',
+      monthly:MONTHLY.map(m=>({...m,apiColor:m.api==='$0,00'?C.ink2:C.hold})), clientReport, setReport,
+      // Поставки
+      settingsTabs, setTemplates:stab==='templates', setRubric:stab==='rubric', setBanned:stab==='banned', setFormat:stab==='format', setRouting:stab==='routing', setUsers:stab==='users',
+      templateTabs, template, templateText:tplText, setTemplateText:e=>this.setState({tplText:e.target.value}),
+      templateClean:tplText===template.content, templateOpacity:tplText===template.content?.5:1, templateNextV:template.version+1,
+      templateHint:tplText===template.content?'Нема промени.':'Старата верзија остнува во историјата и може да се врати.',
+      saveTemplate:()=>{this.setState({tplText:null});this.toast('Зачувана верзија '+(template.version+1));},
+      rubricRows:RUBRIC.map(name=>({name})), banned, routing:ROUTING, modelOptions:['Fable 5.1','Opus','Sonnet','Haiku','—'].map(name=>({name})), users:USERS,
+      metaToken:s.tokenShown?'EAAG8xk29Zd0BA…q7Rf':'••••••••••••••••••••', tokenLabel:s.tokenShown?'Скрij':'Покажи', toggleToken:()=>this.setState(p=>({tokenShown:!p.tokenShown})),
+      inboxSummary:items.length?`${items.length} ставки од ${new Set(items.map(i=>i.client)).size} клиенти`:'', inboxEmpty:items.length===0, inboxGroups, onlyMine:s.onlyMine, toggleOnlyMine:()=>this.setState(p=>({onlyMine:!p.onlyMine})), activeSetsCount:3,
+      clientsCount:CLIENTS.length, clientRows:CLIENTS.map(c=>({...c,brainColor:c.brainOk?C.ok:C.hold,cov:c.coverage.map(a=>({bars:bars(a)})),waiting:c.id==='aleks'?(waitingScripts.length?1:0)+conceptSets.length+(s.proposals.length?1:0):c.waiting,go:()=>c.id==='aleks'?this.go({screen:'client',clientId:'aleks',clientTab:'overview'}):this.toast('Во прототипот е отворен само клиентот Алекс Дизајн')})),
+      client, clientTabs, isClientOverview:s.clientTab==='overview', isClientBrain:s.clientTab==='brain', isClientSets:s.clientTab==='sets',
+      whatsNew:WHATS_NEW, whatsNewCount:WHATS_NEW.length, avatarRows, setRows,
+      brainTabs, isBrainProfile:s.brainTab==='profile', isBrainAvatars:s.brainTab==='avatars', isBrainProducts:s.brainTab==='products', isBrainActors:s.brainTab==='actors', isBrainLocations:s.brainTab==='locations', isBrainCompetitors:s.brainTab==='competitors', isBrainReferences:s.brainTab==='references', isBrainGlossary:s.brainTab==='glossary', isBrainInsights:s.brainTab==='insights',
+      showDiff:s.showDiff, toggleDiff:()=>this.setState(p=>({showDiff:!p.showDiff})), diffBorder:s.showDiff?C.ink:C.rule, diffBg:s.showDiff?C.ink:'#fff', diffColor:s.showDiff?'#fff':C.ink,
+      diffLines:[{sign:'+',color:C.ok,text:'Кампања „20 години“ (август–септември): попусти до 40% и ваучер од 2.000 денари за купувачи на рати.'},{sign:'+',color:C.ok,text:'ИУТЕ партнерство: 36 рати без камата — клучен аргумент за над половина од купувачите.'},{sign:'−',color:C.fail,text:'Летна кампања „Освежи ја дневната“ (јуни–јули).'},{sign:'~',color:C.ink2,text:'Тон: додадено „клиентот не сака да звучи скапо ниту најевтино“.'}],
+      profileDoc:PROFILE_DOC.map(([title,text])=>({title,text})), avatarCards, products:PRODUCTS, actors:ACTORS, locations:LOCATIONS,
+      competitors:COMPETITORS.concat(s.proposals.filter(p=>p.confirmed).map(p=>({...p,not:'—',status:'confirmed'}))).map(c=>({...c,statusLabel:st(c.status).label,statusColor:st(c.status).c})),
+      hasProposals:s.proposals.some(p=>!p.confirmed), proposals:s.proposals.filter(p=>!p.confirmed).map(p=>({...p,confirm:()=>{this.setState(q=>({proposals:q.proposals.map(x=>x.name===p.name?{...x,confirmed:true}:x)}));this.toast('Потврдено');},reject:()=>{this.setState(q=>({proposals:q.proposals.filter(x=>x.name!==p.name)}));this.toast('Отфрлено');}})),
+      references:REFERENCES, glossary:GLOSSARY.map(g=>({...g,kindColor:g.kind==='забранет'?C.fail:g.kind==='претпочитан'?C.ok:C.ink2})),
+      // brief
+      briefN:b.n, briefN2:b.n*2, incN:()=>this.setState(p=>({brief:{...p.brief,n:Math.min(10,p.brief.n+1)}})), decN:()=>this.setState(p=>({brief:{...p.brief,n:Math.max(1,p.brief.n-1)}})),
+      typeChips, briefProduct:b.product, setBriefProduct:setB('product'), productOptions:PRODUCTS, briefOffer:b.offer, setBriefOffer:setB('offer'), briefAvatars, briefActors, briefLocations,
+      briefNotes:b.notes, setBriefNotes:setB('notes'), briefInsp:b.insp, setBriefInsp:setB('insp'), inspRework:b.inspMode==='rework', inspNot:b.inspMode==='not', setInspRework:()=>this.setState(p=>({brief:{...p.brief,inspMode:'rework'}})), setInspNot:()=>this.setState(p=>({brief:{...p.brief,inspMode:'not'}})),
+      briefCons:b.cons, setBriefCons:setB('cons'), briefSec:b.sec, setBriefSec:setB('sec'),
+      briefSummary:`${b.n} сценарија · ${b.avatars.length} аватари · ${b.actors.length} актери · ~${b.sec} сек`,
+      generate:()=>this.generate(),
+      // set
+      set, setStatusLabel:st(set.status).label, setStatusColor:st(set.status).c, setTabs,
+      isSetBrief:s.setTab==='brief', isSetConcepts:s.setTab==='concepts', isSetScripts:s.setTab==='scripts', isSetTranscripts:s.setTab==='transcripts', isSetCost:s.setTab==='cost', isSetExport:s.setTab==='export',
+      setAvatarsText:set.brief?set.brief.avatars.map(id=>av(id).name).join(', '):[...new Set(setScripts.map(x=>av(x.avatar).name))].join(', ')||'—',
+      setActorsText:set.brief?[...set.brief.actors.map(id=>ac(id).name),...set.brief.locations.map(id=>lo(id).name)].join(', '):[...new Set(setScripts.map(x=>ac(x.actor).name)),...new Set(setScripts.map(x=>lo(x.location).name))].join(', ')||'—',
+      setNotesText:set.brief?(set.brief.notes||'—'):'Роденденска кампања 20 години. Ваучер ИУТЕ 2.000 ден. Јуле не изговара цени.',
+      conceptsGenerating:set.status==='concepts', conceptsReady:set.status!=='concepts'&&s.concepts.length>0&&set.id===s.conceptSetId, conceptsDecided:set.status!=='concepts'&&set.id!==s.conceptSetId, conceptsDecidedText:setScripts.length?`Избрани ${setScripts.length} од ${setScripts.length*2} карти · ${set.created} · ${set.writer}`:`Сетот е архивиран; картите не се чуваат по учењето · ${set.created} · ${set.writer}`, progressPct:pct,
+      conceptCards, selectedCount, selectedHint:selectedCount<set.requested?`Избери уште ${set.requested-selectedCount} или пиши помалку.`:selectedCount===set.requested?'Точно колку што бараше брифот.':`${selectedCount-set.requested} повеќе од барани — во ред е.`,
+      conceptCommentDraft:s.conceptComment, setConceptComment:e=>this.setState({conceptComment:e.target.value}),
+      moreCards:()=>this.moreCards(), moreDisabled:selectedCount===0||s.moreGen, moreOpacity:selectedCount===0||s.moreGen?.5:1, moreGenerating:s.moreGen,
+      writeSelected:()=>this.writeSelected(), writeDisabled, writeOpacity:writeDisabled?.5:1,
+      goSetConcepts:()=>this.go({setTab:'concepts'}), goSetScripts:()=>this.go({setTab:'scripts'}), goSetExport:()=>this.go({setTab:'export'}),
+      // scripts
+      noScriptsYet:setScripts.length===0, hasScripts:setScripts.length>0, writingLine, writingPct:setScripts.length?Math.round((setScripts.length-writingScripts.length)/setScripts.length*100)+'%':'0%',
+      scriptList, script:script||{}, scriptNN:nn, scriptWriting:script&&!readable, scriptReadable:!!readable, scriptFailed:script&&script.status==='failed', scriptApproved:script&&['ok','live','learned','exported'].includes(script.status),
+      scriptStatusLabel:script?st(script.status).label:'', scriptTypeLabel:script?TYPES[script.type]:'', scriptAvatarName:script?av(script.avatar).name:'', scriptActorName:script?ac(script.actor).name:'', scriptLocationName:script?lo(script.location).name:'',
+      scriptAvatar:script?av(script.avatar):{}, scriptActor:script?ac(script.actor):{}, scriptLocation:script?lo(script.location):{},
+      frames, versions:script?script.versions:[], versionsCount:script?script.versions.length:0, nextVersion:script?script.version+1:1,
+      editing:s.editing, editPad:s.editing?'12px':'0', editBg:s.editing?'#FBFBFA':'transparent',
+      showCheckpoint:script&&(script.status==='wait'||script.status==='failed'||(s.editing&&script.status==='ok')), normalMode:!s.editing&&!s.returning, returning:s.returning,
+      checkpointHint:script&&script.status==='failed'?'Можеш да одобриш и без поминат праг.':'Одобрувањето го заклучува сценариото за експорт.',
+      approve:()=>this.approve(), startEdit:()=>this.setState({editing:true,returning:false}), cancelEdit:()=>this.setState({editing:false}), saveEdit:()=>this.saveEdit(),
+      startReturn:()=>this.setState({returning:true,editing:false}), cancelReturn:()=>this.setState({returning:false,comment:''}), sendReturn:()=>this.sendReturn(),
+      comment:s.comment, setComment:e=>this.setState({comment:e.target.value}), commentEmpty:!s.comment.trim(), commentOpacity:s.comment.trim()?1:.5,
+      allApproved,
+      ctxOpen:s.ctxOpen, ctxClosed:!s.ctxOpen, ctxWidth:s.ctxOpen?'320px':'36px', ctxBasis:s.ctxOpen?'280px':'36px', toggleCtx:()=>this.setState(p=>({ctxOpen:!p.ctxOpen})), ctxTabs, ctxCritic:s.ctxTab==='critic', ctxContext:s.ctxTab==='context',
+      criticTotal:total, criticVerdict:passed?'поминува прагот':'под прагот', criticColor:passed?C.ok:C.hold, criteria, findings, findingsCount:findings.length, noFindings:findings.length===0,
+      // transcripts / cost
+      runTabs:['Креативен директор','Писател 01','Писател 02','Критичар 02'].map((l,i)=>({label:l,border:s.runTab===i?C.ink:C.rule,bg:s.runTab===i?'#fff':'transparent',go:()=>this.setState({runTab:i})})),
+      transcript:(()=>{const t=['Креативен директор','Писател 01','Писател 02','Критичар 02'][s.runTab];
+        const head={role:'run',text:`${t} · сесија ${set.code}-${String(s.runTab+1).padStart(2,'0')} · завршен`};
+        const body=s.runTab===0?[{role:'system',text:'Creative Director v3 · влез: бриф, профил v3, аватари, инсајти, „ова НЕ“'},{role:'tool',text:'Read client-profile.md (v3) · кеширано'},{role:'assistant',text:`${set.requested*2} концепт-карти, по две за секое барано сценарио.`}]
+          :s.runTab===3?[{role:'system',text:'Critic · рубрика v2 · 11 критериуми'},{role:'assistant',text:'Времетраење 2/5 — набројувањето надминува 2,5 збор/сек. Барам ревизија.'},{role:'system',text:'Ревизија 1 од 2 испратена кон Писателот во истата сесија.'}]
+          :TRANSCRIPT;
+        return [head,...body].map(m=>({...m,open:m.role!=='tool',color:m.role==='tool'?C.ink2:C.ink,wrap:m.role==='tool'?'nowrap':'normal'}));})(),
+      costs:COSTS, costPct:Math.round(parseFloat((set.cost||'$0').replace('$','').replace(',','.'))/parseFloat((set.budget||'$8').replace('$',''))*100)+'%',
+      // export
+      exportBlocked:!allApproved, exportReady:allApproved, approvedCountText:`Одобрени ${approvedCount} од ${setScripts.length}.`,
+      exportTitle:exportFile, exportSub:`${setScripts.length} сценарија · ${set.code} · ${set.writer}`, exportPages, exportPeople:people, exportFile,
+      notExported:!set.exported&&!s.exporting, exporting:s.exporting, isExported:!!set.exported, doExport:()=>this.doExport(),
+      // base
+      baseCount:allBase.length, baseQuery:s.baseQuery, setBaseQuery:e=>this.setState({baseQuery:e.target.value}), baseFilters, baseRows, baseEmpty:baseRows.length===0,
+      otherTitle:other[0], otherText:other[1], otherSub:other[2],
+      toast:s.toast,
+    };
+  }
+
+  generate(){
+    const b=this.state.brief, D=this.state.D;
+    const id='set-new', code='ALEKS-2609';
+    const newSet={id,clientId:'aleks',code,name:'Есенска понуда — кујни по мерка',status:'concepts',requested:b.n,writer:'Александар',created:'05.09.2026',cost:'$0,00',budget:'$8',product:b.product+(b.offer?' — '+b.offer:''),brief:{...b},exported:false};
+    this.setState(p=>({sets:[newSet,...p.sets.filter(x=>x.id!==id)],concepts:[],conceptSetId:id,phase:'concepts'}));
+    this.go({screen:'set',setId:id,setTab:'concepts'});
+    this.toast('Сетот е креиран. Се генерираат концепти.');
+    this.runProgress(3800,()=>{
+      const pool=D.CONCEPTS.filter(c=>b.actors.includes(c.actor)&&b.locations.includes(c.location));
+      const cards=(pool.length>=b.n*2?pool:D.CONCEPTS).slice(0,Math.max(b.n*2,4)).map(c=>({...c,decision:'PENDING'}));
+      this.setState(p=>({concepts:cards,sets:p.sets.map(x=>x.id===id?{...x,status:'conceptsWait',cost:'$0,92'}:x),phase:''}));
+      this.pulseOnce();
+    });
+  }
+  moreCards(){
+    const D=this.state.D, sel=this.state.concepts.find(c=>c.decision==='SELECTED');
+    this.setState({moreGen:true});
+    this.runProgress(2400,()=>{
+      const used=new Set(this.state.concepts.map(c=>c.id));
+      let extra=D.CONCEPTS.filter(c=>!used.has(c.id)).slice(0,3);
+      if(extra.length<3){ extra=extra.concat(D.CONCEPTS.filter(c=>c.type===sel.type).slice(0,3-extra.length).map((c,i)=>({...c,id:c.id+'-v'+Date.now()+i,hook:c.hook.replace(/\.$/,'')+' — варијанта за '+D.AVATARS.find(a=>a.id===sel.avatar).name.split(',')[0]+'.',avatar:sel.avatar,suggested:false}))); }
+      this.setState(p=>({moreGen:false,concepts:[...p.concepts,...extra.map(c=>({...c,decision:'PENDING'}))]}));
+      this.toast('Додадени 3 карти');
+    });
+  }
+  writeSelected(){
+    const D=this.state.D, s=this.state, set=s.sets.find(x=>x.id===s.setId);
+    const sel=s.concepts.filter(c=>c.decision==='SELECTED');
+    const existing=s.scripts.filter(x=>x.code.startsWith('ALEKS-2609')).length;
+    const mk=(c,i)=>({id:'gen-'+c.id,setId:set.id,code:`ALEKS-2609-${String(existing+i+1).padStart(2,'0')}`,title:c.hook.replace(/[?.!—].*$/,'').trim(),type:c.type,avatar:c.avatar,actor:c.actor,location:c.location,sec:c.sec,status:'writing',version:1,versions:[{v:1,who:'Писател',when:'05.09 · сега'}],
+      scores:[5,4,4,5,4,5,4,4,5,4,5].map((v,k)=>Math.max(3,Math.min(5,v+((i+k)%3)-1))),findings:i%2?[{frame:2,text:'Проверете дали ратата од продуктот се совпаѓа со базата (Точност).'}]:[],
+      frames:[{n:1,role:'ХООК',direction:`${D.ACTORS.find(a=>a.id===c.actor).name} гледа право во камера, ${D.LOCATIONS.find(l=>l.id===c.location).name.toLowerCase()}.`,lines:[{actor:D.ACTORS.find(a=>a.id===c.actor).name,text:'„'+c.hook+'“'}]},
+              {n:2,role:'БОДИ',direction:c.body,lines:[{actor:D.ACTORS.find(a=>a.id===c.actor).name,text:c.bodyLine}],editing:c.type==='PRODUCT_OFFER'?'Ратата како натпис на екран до производот.':undefined},
+              {n:3,role:'ЦТА',direction:'Лого 20 години, кадри од салонот.',lines:[{actor:D.ACTORS.find(a=>a.id===c.actor).name,text:'„Дојдете во Алекс Дизајн во Радишани или пишете ни на Instagram — одговараме истиот ден.“'}]}]});
+    const newScripts=sel.map(mk);
+    this.setState(p=>({scripts:[...p.scripts,...newScripts],sets:p.sets.map(x=>x.id===set.id?{...x,status:'writing',requested:sel.length}:x),phase:'writing'}));
+    this.go({setTab:'scripts',scriptId:newScripts[0].id});
+    newScripts.forEach((ns,i)=>{
+      this.later(this.spd(1500+i*1400),()=>this.setState(p=>({scripts:p.scripts.map(x=>x.id===ns.id?{...x,status:'critic'}:x)})));
+      this.later(this.spd(2600+i*1400),()=>this.setState(p=>{const scripts=p.scripts.map(x=>x.id===ns.id?{...x,status:'wait'}:x);const done=scripts.filter(x=>x.setId===set.id).every(x=>x.status==='wait');return{scripts,phase:done?'':p.phase,sets:done?p.sets.map(x=>x.id===set.id?{...x,status:'wait',cost:'$4,40'}:x):p.sets};}));
+    });
+    this.later(this.spd(2700+(newScripts.length-1)*1400),()=>this.pulseOnce());
+  }
+  approve(){
+    const s=this.state, id=s.scriptId;
+    this.setState(p=>{const scripts=p.scripts.map(x=>x.id===id?{...x,status:'ok'}:x);const setScripts=scripts.filter(x=>x.setId===p.setId);const all=setScripts.every(x=>['ok','live','learned'].includes(x.status));return{scripts,sets:all?p.sets.map(x=>x.id===p.setId?{...x,status:'ok'}:x):p.sets};});
+    this.toast('Одобрено');
+    const next=s.scripts.filter(x=>x.setId===s.setId&&x.id!==id&&(x.status==='wait'||x.status==='failed'))[0];
+    if(next) this.later(500,()=>this.setState({scriptId:next.id}));
+  }
+  saveEdit(){
+    const read=(x)=>x.frames.map(f=>{
+      const el=document.getElementById('frame-'+f.n); if(!el) return f;
+      const g=(sel)=>{const n=el.querySelector(sel);return n?n.innerText.trim():null;};
+      const dir=g('[data-e="d"]'), mon=g('[data-e="m"]');
+      const lines=f.lines.map((l,i)=>{const t=g('[data-e="l'+i+'"]');return t?{...l,text:t}:l;});
+      return {...f, direction:dir||f.direction, lines, editing:f.editing?(mon||f.editing):f.editing};
+    });
+    this.setState(p=>({editing:false,scripts:p.scripts.map(x=>x.id===p.scriptId?{...x,frames:read(x),version:x.version+1,versions:[{v:x.version+1,who:'Александар · рачна доработка',when:'05.09 · сега'},...x.versions]}:x)}));
+    this.toast('Зачувана нова верзија');
+  }
+  sendReturn(){
+    const id=this.state.scriptId;
+    this.setState(p=>({returning:false,comment:'',scripts:p.scripts.map(x=>x.id===id?{...x,status:'revising'}:x)}));
+    this.toast('Вратено со коментар. Писателот продолжува во истата сесија.');
+    this.later(this.spd(3200),()=>{this.setState(p=>({scripts:p.scripts.map(x=>x.id===id?{...x,status:'wait',version:x.version+1,versions:[{v:x.version+1,who:'Писател · ревизија по коментар',when:'05.09 · сега'},...x.versions],findings:[]}:x)}));this.pulseOnce();});
+  }
+  doParse(){
+    this.setState({impStage:'parsing'});
+    this.runProgress(2000,()=>{
+      const txt=this.state.impText||'';
+      const blocks=txt.split(/\n\s*\n/).filter(b=>/КАДАР/i.test(b));
+      const roles=['ХООК','БОДИ','ЦТА'];
+      const frames=blocks.map((b,i)=>{
+        const lines=b.split('\n').filter(Boolean);
+        const head=lines[0]||'';
+        const m=head.match(/\(([^)]*)\)/);
+        const rest=lines.slice(1).join(' ').trim();
+        return {n:i+1,role:i===0?'ХООК':i===blocks.length-1?'ЦТА':'БОДИ',direction:m?m[1].charAt(0).toUpperCase()+m[1].slice(1)+'.':head.replace(/^КАДАР\s*\d+\s*/i,''),lines:[{actor:this.state.impActor||'Ајтов',text:'„'+rest+'“'}]};
+      });
+      this.setState({impStage:'parsed',parsedFrames:frames.length?frames:[{n:1,role:roles[0],direction:'Не најдов кадри — провери го форматот.',lines:[]}]});
+    });
+  }
+  doExport(){
+    this.setState({exporting:true});
+    this.runProgress(2200,()=>{this.setState(p=>({exporting:false,sets:p.sets.map(x=>x.id===p.setId?{...x,exported:true,status:'exported'}:x),scripts:p.scripts.map(x=>x.setId===p.setId?{...x,status:'exported'}:x)}));this.toast('Експортирано');});
+  }
+}
+</script>
+</body>
+</html>
