@@ -97,11 +97,11 @@ if (isMain) {
   buildServer()
     .then((app) => app.listen({ port: env.API_PORT, host: '0.0.0.0' }))
     .then((addr) => {
-      // eslint-disable-next-line no-console
+       
       console.log(`GoScriptAI API listening on ${addr}`);
     })
     .catch((err) => {
-      // eslint-disable-next-line no-console
+       
       console.error(err);
       process.exit(1);
     });

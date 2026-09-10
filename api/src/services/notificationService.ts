@@ -24,9 +24,9 @@ const LABELS: Record<NotifyEvent, string> = {
   agent_failed: 'Агентски job падна.',
 };
 
-async function send(channel: 'email' | 'telegram', to: string, text: string, link: string) {
+async function send(channel: 'email' | 'telegram', _to: string, _text: string, _link: string) {
   // Pluggable senders — no-op unless credentials are present. Real SES/Telegram
-  // wiring lives here; kept side-effect-free in dev.
+  // wiring lives here (using _to/_text/_link); kept side-effect-free in dev.
   if (channel === 'email' && env.SES_FROM_EMAIL) {
     // await ses.send(...)
   }

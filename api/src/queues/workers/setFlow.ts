@@ -5,7 +5,7 @@ import { conceptsSchema, scriptSchema, criticSchema } from '../../agents/schemas
 import { stubConcepts, stubScript, stubCritic, type StubConcept } from '../../agents/setStubs.js';
 import { startRun, recordMessage, recordCost, finishRun } from '../../services/agentRunService.js';
 import { buildCode, nextSequence } from '../../domain/code.js';
-import { renderScriptMarkdown, estimateSeconds, type ScriptContent } from '../../domain/scriptFormat.js';
+import { renderScriptMarkdown, type ScriptContent } from '../../domain/scriptFormat.js';
 import { evaluateCritic, nextCriticOutcome, type CriterionScores } from '../../domain/critic.js';
 import { moveSet, maybeReviewSet, enforceBudget } from '../../services/setService.js';
 import { notify } from '../../services/notificationService.js';

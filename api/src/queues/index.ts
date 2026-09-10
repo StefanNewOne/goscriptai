@@ -42,11 +42,10 @@ let workers: Worker[] = [];
 // separate process using the same registration.
 export function registerWorkers() {
   if (workers.length) return;
-  // The processors reference their own worker (for rateLimit) via a late-bound getter.
-  let brainWorker!: Worker<OnboardingJob>;
-  let setWorker!: Worker<SetJob>;
-  brainWorker = new Worker<OnboardingJob>(BRAIN_QUEUE, withRateLimit<OnboardingJob>(() => brainWorker, runOnboardingJob), { connection: makeRedis(), concurrency: 4 });
-  setWorker = new Worker<SetJob>(SET_QUEUE, withRateLimit<SetJob>(() => setWorker, runSetJob), { connection: makeRedis(), concurrency: 4 });
+  // The processors reference their own worker (for rateLimit) via a late-bound
+  // getter; the closure only runs after assignment, so const is safe here.
+  const brainWorker: Worker<OnboardingJob> = new Worker<OnboardingJob>(BRAIN_QUEUE, withRateLimit<OnboardingJob>(() => brainWorker, runOnboardingJob), { connection: makeRedis(), concurrency: 4 });
+  const setWorker: Worker<SetJob> = new Worker<SetJob>(SET_QUEUE, withRateLimit<SetJob>(() => setWorker, runSetJob), { connection: makeRedis(), concurrency: 4 });
 
   // On final failure (attempts exhausted) move the set to FAILED so it never
   // stays stuck in a *_RUNNING status; a manual retry resets it (invariant 3/10).
