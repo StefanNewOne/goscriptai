@@ -6,6 +6,10 @@ import { mk } from '../i18n/mk';
 import { StatusBadge } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
 import { OnboardingPanel } from '../components/OnboardingPanel';
+import { AvatarCard } from '../components/AvatarCard';
+import { PersonCard } from '../components/PersonCard';
+import { PlaceCard } from '../components/PlaceCard';
+import { WhatsNewList } from '../components/WhatsNewList';
 
 const BRAIN_TABS: { key: string; label: string }[] = [
   { key: 'profile', label: mk.brain.profile },
@@ -89,18 +93,7 @@ function Overview({ c }: { c: ClientDetailT }) {
       <div className="grid grid-cols-[1.3fr_1fr] gap-5">
       <section className="rounded-sheet border border-rule bg-sheet">
         <h2 className="border-b border-rule px-4 py-3 text-14 font-medium">{mk.client.whatsNew}</h2>
-        {c.changeLog.length === 0 ? (
-          <p className="px-4 py-4 text-13 text-ink-2">Нема промени.</p>
-        ) : (
-          <ul>
-            {c.changeLog.map((ch) => (
-              <li key={ch.id} className="grid grid-cols-[90px_1fr] gap-3 border-t border-rule px-4 py-3 text-13">
-                <span className="text-ink-2">{ch.kind}</span>
-                <span>{ch.summary}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <WhatsNewList changes={c.changeLog} emptyText="Нема промени." />
       </section>
       <section className="rounded-sheet border border-rule bg-sheet">
         <h2 className="border-b border-rule px-4 py-3 text-14 font-medium">{mk.client.avatarCoverage}</h2>
@@ -163,12 +156,7 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
       return c.avatars.length ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {c.avatars.map((a) => (
-            <div key={a.id} className="rounded-sheet border border-rule bg-sheet p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-16 font-semibold">{a.name}</span>
-                <StatusBadge label={a.status === 'ACTIVE' ? 'потврден' : 'чека потврда'} tone={a.status === 'ACTIVE' ? 'ok' : 'hold'} />
-              </div>
-            </div>
+            <AvatarCard key={a.id} avatar={a} />
           ))}
         </div>
       ) : (
@@ -180,25 +168,22 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
       return c.actors.length ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
           {c.actors.map((a) => (
-            <div key={a.id} className="grid grid-cols-[120px_1fr] gap-4 rounded-sheet border border-rule bg-sheet p-4">
-              <div className="min-h-[160px] rounded-control bg-[repeating-linear-gradient(45deg,#ECEEEB,#ECEEEB_8px,#F5F6F4_8px,#F5F6F4_16px)]" />
-              <div>
-                <div className="text-20 font-semibold">{a.name}</div>
-                <div className="mb-2 text-13 text-ink-2">
-                  {a.role} · {a.languages.map((l) => mk.lang[l]).join(', ')}
-                </div>
-                {a.style && <div className="text-13"><span className="text-ink-2">Стил: </span>{a.style}</div>}
-                {a.canDo.length > 0 && <div className="text-13"><span className="text-ink-2">Може: </span>{a.canDo.join(', ')}</div>}
-                {a.cannotDo.length > 0 && <div className="text-13"><span className="text-ink-2">Не може: </span>{a.cannotDo.join(', ')}</div>}
-              </div>
-            </div>
+            <PersonCard key={a.id} actor={a} />
           ))}
         </div>
       ) : (
         <EmptyState text="Нема актери. Додади барем еден за да стане клиентот активен." />
       );
     case 'locations':
-      return <SimpleTable rows={c.locations.map((l) => [l.name, l.description, l.constraints ?? ''])} head={['Локација', 'Опис', 'Ограничувања']} empty="Нема локации." />;
+      return c.locations.length ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+          {c.locations.map((l) => (
+            <PlaceCard key={l.id} location={l} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState text="Нема локации." />
+      );
     case 'competitors':
       return <SimpleTable rows={c.competitors.map((x) => [x.name, x.why ?? '', x.status])} head={['Конкурент', 'Зошто', 'Статус']} empty="Нема конкуренти." />;
     case 'references':
