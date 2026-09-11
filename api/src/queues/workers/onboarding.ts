@@ -38,15 +38,17 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
         await recordMessage(run.id, 'user', { prompt }, scope, client.id);
         let sessionId: string | undefined;
         let questions;
+        let costUsd = isStubMode() ? 0.01 : 0;
         if (isStubMode()) {
           questions = stubAnalystQuestions(client.name);
         } else {
           const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: questionsSchema });
           questions = parseAgentJson<ReturnType<typeof stubAnalystQuestions>>(res);
           sessionId = res.sessionId;
+          costUsd = res.costUsd;
         }
         await recordMessage(run.id, 'questions', questions, scope, client.id);
-        await recordCost({ runId: run.id, clientId: client.id, agentKind: 'client_analyst', model: routing.model, usd: isStubMode() ? 0.01 : 0, scope, scopeId: client.id });
+        await recordCost({ runId: run.id, clientId: client.id, agentKind: 'client_analyst', model: routing.model, usd: costUsd, scope, scopeId: client.id });
         await finishRun(run.id, 'DONE', scope, client.id, 'client_analyst', undefined, sessionId);
         await advance(client.id, 'ANALYST_RUNNING', 'ANALYST_QUESTIONS');
         await publish({ type: 'questions.ready', scope, id: client.id });
@@ -60,19 +62,21 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
           : `Состави ClientProfile.md од одговорите на операторот: ${JSON.stringify(answers)}. Врати markdown + структурирани податоци во бараниот JSON облик.`;
         let sessionId: string | undefined;
         let profile;
+        let costUsd = isStubMode() ? 0.03 : 0;
         if (isStubMode()) {
           profile = stubClientProfile(client.name, answers);
         } else {
           const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: profileSchema, sessionId: prior?.sessionId ?? undefined });
           profile = parseAgentJson<ReturnType<typeof stubClientProfile>>(res);
           sessionId = res.sessionId;
+          costUsd = res.costUsd;
         }
         const last = await prisma.clientProfile.findFirst({ where: { clientId: client.id }, orderBy: { version: 'desc' } });
         const version = (last?.version ?? 0) + 1;
         await prisma.clientProfile.create({ data: { clientId: client.id, version, markdown: profile.markdown, data: profile.data as never, approved: false } });
         await prisma.brainChange.create({ data: { clientId: client.id, kind: 'Профил', summary: `Генериран профил v${version} (чека одобрување).` } });
         await recordMessage(run.id, 'profile', profile, scope, client.id);
-        await recordCost({ runId: run.id, clientId: client.id, agentKind: 'client_analyst', model: routing.model, usd: isStubMode() ? 0.03 : 0, scope, scopeId: client.id });
+        await recordCost({ runId: run.id, clientId: client.id, agentKind: 'client_analyst', model: routing.model, usd: costUsd, scope, scopeId: client.id });
         await finishRun(run.id, 'DONE', scope, client.id, 'client_analyst', undefined, sessionId);
         await advance(client.id, 'ANALYST_RUNNING', 'ANALYST_REVIEW');
         await publish({ type: 'profile.ready', scope, id: client.id });
@@ -91,6 +95,7 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
   try {
     const profileDoc = await prisma.clientProfile.findFirst({ where: { clientId: client.id, approved: true }, orderBy: { version: 'desc' } });
     let avatars: StubAvatar[];
+    let costUsd = isStubMode() ? 0.02 : 0;
     if (isStubMode()) {
       avatars = stubAvatars(client.name);
     } else {
@@ -101,13 +106,14 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
         schema: avatarsSchema,
       });
       avatars = parseAgentJson<{ avatars: StubAvatar[] }>(res).avatars;
+      costUsd = res.costUsd;
     }
     for (const a of avatars) {
       await prisma.avatar.create({ data: { clientId: client.id, name: a.name, profile: a.profile as never, status: 'PENDING_CONFIRMATION' } });
     }
     await prisma.brainChange.create({ data: { clientId: client.id, kind: 'Аватари', summary: `Предложени ${avatars.length} аватари (чекаат потврда).` } });
     await recordMessage(run.id, 'avatars', { count: avatars.length }, scope, client.id);
-    await recordCost({ runId: run.id, clientId: client.id, agentKind: 'avatar_builder', model: routing.model, usd: isStubMode() ? 0.02 : 0, scope, scopeId: client.id });
+    await recordCost({ runId: run.id, clientId: client.id, agentKind: 'avatar_builder', model: routing.model, usd: costUsd, scope, scopeId: client.id });
     await finishRun(run.id, 'DONE', scope, client.id, 'avatar_builder');
     await advance(client.id, 'AVATARS_RUNNING', 'AVATARS_REVIEW');
     await publish({ type: 'avatars.ready', scope, id: client.id });

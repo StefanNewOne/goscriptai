@@ -38,12 +38,14 @@ async function creativeDirector(setId: string) {
     const actorIds = brief.actorIds?.length ? brief.actorIds : actors.map((a) => a.id);
     const locationIds = brief.locationIds?.length ? brief.locationIds : locations.map((l) => l.id);
     let concepts: StubConcept[];
+    let costUsd = isStubMode() ? 0.5 : 0;
     if (isStubMode()) {
       concepts = stubConcepts({ requested: set.requested, clientName: set.client.name, avatarIds, actorIds, locationIds, product: brief.product });
     } else {
       const ctx = `Клиент: ${set.client.name} (јазик ${set.client.language}). Барани сценарија: ${set.requested} (генерирај ${set.requested * 2} концепти).\nПродукт во фокус: ${brief.product ?? '—'}\nАватари (id·име): ${avatars.map((a) => `${a.id}·${a.name}`).join(', ')}\nАктери (id·име·јазици): ${actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${locations.map((l) => `${l.id}·${l.name}`).join(', ')}`;
       const res = await runQuery({ systemPrompt: system, prompt: `${ctx}\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`, model: routing.model, schema: conceptsSchema });
       concepts = parseAgentJson<{ concepts: StubConcept[] }>(res).concepts;
+      costUsd = res.costUsd;
     }
     for (const c of concepts) {
       await prisma.concept.create({
@@ -51,7 +53,7 @@ async function creativeDirector(setId: string) {
       });
     }
     await recordMessage(run.id, 'concepts', { count: concepts.length }, 'set', setId);
-    await recordCost({ runId: run.id, clientId: set.clientId, setId, agentKind: 'creative_director', model: routing.model, usd: isStubMode() ? 0.5 : 0, scope: 'set', scopeId: setId });
+    await recordCost({ runId: run.id, clientId: set.clientId, setId, agentKind: 'creative_director', model: routing.model, usd: costUsd, scope: 'set', scopeId: setId });
     await finishRun(run.id, 'DONE', 'set', setId, 'creative_director');
     if (await enforceBudget(setId)) return;
     await moveSet(setId, ['CONCEPTS_GENERATING'], 'CONCEPTS_REVIEW');
@@ -77,6 +79,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
     const brief = set.brief as { product?: string };
     let drafted: { title: string; content: ScriptContent };
     let writerSession: string | undefined;
+    let costUsd = isStubMode() ? 0.4 : 0;
     if (isStubMode()) {
       drafted = stubScript({ actorName, hook: card.hook, product: brief.product });
     } else {
@@ -91,6 +94,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
       const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: scriptSchema, sessionId: priorRun?.sessionId ?? undefined });
       drafted = parseAgentJson<{ title: string; content: ScriptContent }>(res);
       writerSession = res.sessionId;
+      costUsd = res.costUsd;
     }
 
     // Move set into CRITIC phase (tolerant of concurrent writers).
@@ -127,7 +131,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
     }
 
     await recordMessage(run.id, 'script', { code: script!.code }, 'set', set.id);
-    await recordCost({ runId: run.id, clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, usd: isStubMode() ? 0.4 : 0, scope: 'set', scopeId: set.id });
+    await recordCost({ runId: run.id, clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, usd: costUsd, scope: 'set', scopeId: set.id });
     await finishRun(run.id, 'DONE', 'set', set.id, 'writer', undefined, writerSession);
     if (await enforceBudget(set.id)) return;
     await setQueue.add('critic', { kind: 'critic', setId: set.id, scriptId: script!.id });
@@ -145,6 +149,7 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
   try {
     let scores: CriterionScores;
     let findings: { criterion: string; text: string; frame?: number }[];
+    let costUsd = isStubMode() ? 0.3 : 0;
     if (isStubMode()) {
       ({ scores, findings } = stubCritic());
     } else {
@@ -157,13 +162,14 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
       const parsed = parseAgentJson<{ scores: CriterionScores; findings: { criterion: string; text: string; frame?: number }[] }>(res);
       scores = parsed.scores;
       findings = parsed.findings;
+      costUsd = res.costUsd;
     }
     const evaluation = evaluateCritic(scores);
     const outcome = nextCriticOutcome(evaluation, script.revisionRound);
     const report = { scores, findings, totalPercent: evaluation.totalPercent, passed: evaluation.passed, failedCriteria: evaluation.failedCriteria };
 
     await prisma.script.update({ where: { id: script.id }, data: { criticReport: report as never } });
-    await recordCost({ runId: run.id, clientId: script.clientId, setId: script.setId ?? undefined, agentKind: 'critic', model: routing.model, usd: isStubMode() ? 0.3 : 0, scope: 'set', scopeId: script.setId! });
+    await recordCost({ runId: run.id, clientId: script.clientId, setId: script.setId ?? undefined, agentKind: 'critic', model: routing.model, usd: costUsd, scope: 'set', scopeId: script.setId! });
     await finishRun(run.id, 'DONE', 'set', script.setId!, 'critic');
     if (await enforceBudget(script.setId!)) return;
 

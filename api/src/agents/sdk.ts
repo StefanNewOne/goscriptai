@@ -63,7 +63,10 @@ export async function runQuery(input: RunQueryInput): Promise<RunQueryResult> {
     options: {
       model: input.model,
       systemPrompt: input.systemPrompt,
-      maxTurns: input.maxTurns ?? 1,
+      // Headroom so a model that thinks before emitting the structured result
+      // doesn't hit error_max_turns (opus critic needs >1); no tools are enabled
+      // (allowedTools: []), so there is no tool-call loop to run away.
+      maxTurns: input.maxTurns ?? 8,
       permissionMode: 'bypassPermissions',
       allowedTools: [],
       ...(input.sessionId ? { resume: input.sessionId } : {}),
