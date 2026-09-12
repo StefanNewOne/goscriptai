@@ -7,9 +7,9 @@ import { StatusBadge } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
 import { OnboardingPanel } from '../components/OnboardingPanel';
 import { AvatarCard } from '../components/AvatarCard';
-import { PersonCard } from '../components/PersonCard';
-import { PlaceCard } from '../components/PlaceCard';
 import { WhatsNewList } from '../components/WhatsNewList';
+import { BrainSection } from '../components/BrainSection';
+import type { FieldDef } from '../components/BrainForm';
 
 const BRAIN_TABS: { key: string; label: string }[] = [
   { key: 'profile', label: mk.brain.profile },
@@ -138,6 +138,73 @@ function Brain({ c, tab }: { c: ClientDetailT; tab: string }) {
   );
 }
 
+// Field definitions per Brain entity — drive the shared BrainForm. Names match
+// the backend Zod schemas exactly (api/src/schemas/brain.ts).
+const langOpts = (['MK', 'SQ', 'BOTH'] as const).map((v) => ({ value: v, label: mk.lang[v] ?? v }));
+const bfOpt = mk.bf.opt as Record<string, string>;
+const PRODUCT_FIELDS: FieldDef[] = [
+  { name: 'name', label: mk.bf.f.name, kind: 'text', required: true },
+  { name: 'category', label: mk.bf.f.category, kind: 'text' },
+  { name: 'price', label: mk.bf.f.price, kind: 'number' },
+  { name: 'installment', label: mk.bf.f.installment, kind: 'number' },
+  { name: 'usp', label: mk.bf.f.usp, kind: 'textarea' },
+  { name: 'seasonality', label: mk.bf.f.seasonality, kind: 'text' },
+  { name: 'active', label: mk.bf.f.active, kind: 'checkbox', defaultChecked: true },
+];
+const ACTOR_FIELDS: FieldDef[] = [
+  { name: 'name', label: mk.bf.f.name, kind: 'text', required: true },
+  { name: 'role', label: mk.bf.f.role, kind: 'text', required: true },
+  { name: 'languages', label: mk.bf.f.languages, kind: 'langs' },
+  { name: 'style', label: mk.bf.f.style, kind: 'text' },
+  { name: 'canDo', label: mk.bf.f.canDo, kind: 'tags', hint: mk.bf.hint.tags },
+  { name: 'cannotDo', label: mk.bf.f.cannotDo, kind: 'tags', hint: mk.bf.hint.tags },
+  { name: 'notes', label: mk.bf.f.notes, kind: 'textarea' },
+];
+const LOCATION_FIELDS: FieldDef[] = [
+  { name: 'name', label: mk.bf.f.name, kind: 'text', required: true },
+  { name: 'description', label: mk.bf.f.description, kind: 'textarea', required: true },
+  { name: 'usableElements', label: mk.bf.f.usableElements, kind: 'tags', hint: mk.bf.hint.tags },
+  { name: 'constraints', label: mk.bf.f.constraints, kind: 'textarea' },
+];
+const COMPETITOR_FIELDS: FieldDef[] = [
+  { name: 'name', label: mk.bf.f.name, kind: 'text', required: true },
+  { name: 'why', label: mk.bf.f.why, kind: 'textarea' },
+  { name: 'doNotCopy', label: mk.bf.f.doNotCopy, kind: 'textarea' },
+  { name: 'links', label: mk.bf.f.links, kind: 'kvlines', hint: mk.bf.hint.kv },
+];
+const REFERENCE_FIELDS: FieldDef[] = [
+  {
+    name: 'flag',
+    label: mk.bf.f.flag,
+    kind: 'select',
+    required: true,
+    options: [
+      { value: 'INSPIRATION', label: mk.bf.opt.INSPIRATION },
+      { value: 'DO_NOT_COPY', label: mk.bf.opt.DO_NOT_COPY },
+    ],
+  },
+  { name: 'platform', label: mk.bf.f.platform, kind: 'text' },
+  { name: 'url', label: mk.bf.f.url, kind: 'text' },
+  { name: 'analysis', label: mk.bf.f.analysis, kind: 'textarea' },
+  { name: 'transcript', label: mk.bf.f.transcript, kind: 'textarea' },
+];
+const GLOSSARY_FIELDS: FieldDef[] = [
+  { name: 'language', label: mk.bf.f.language, kind: 'select', required: true, options: langOpts },
+  { name: 'term', label: mk.bf.f.term, kind: 'text', required: true },
+  { name: 'meaning', label: mk.bf.f.meaning, kind: 'text', required: true },
+  {
+    name: 'kind',
+    label: mk.bf.f.kind,
+    kind: 'select',
+    required: true,
+    options: [
+      { value: 'PREFERRED', label: mk.bf.opt.PREFERRED },
+      { value: 'BANNED', label: mk.bf.opt.BANNED },
+      { value: 'PRODUCT_NAME', label: mk.bf.opt.PRODUCT_NAME },
+    ],
+  },
+];
+
 function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
   switch (tab) {
     case 'profile': {
@@ -163,33 +230,143 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
         <EmptyState text="Овој клиент нема аватари. Пушти го агентот за аватари или додади рачно." />
       );
     case 'products':
-      return <SimpleTable rows={c.products.map((p) => [p.name, p.category ?? '', p.installment ? `${p.installment} ден./мес.` : ''])} head={['Производ', 'Категорија', 'Рата']} empty="Нема продукти." />;
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="products"
+          label={mk.brain.products}
+          fields={PRODUCT_FIELDS}
+          items={c.products}
+          emptyText="Нема продукти."
+          renderContent={(p) => (
+            <div>
+              <div className="text-14 font-medium">
+                {p.name}
+                {!p.active && <span className="ml-2 text-13 text-ink-2">(неактивен)</span>}
+              </div>
+              <div className="text-13 text-ink-2">
+                {[p.category, p.price ? `${p.price} ден.` : null, p.installment ? `рата ${p.installment}` : null].filter(Boolean).join(' · ')}
+              </div>
+              {p.usp && <div className="text-13">{p.usp}</div>}
+            </div>
+          )}
+        />
+      );
     case 'actors':
-      return c.actors.length ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-          {c.actors.map((a) => (
-            <PersonCard key={a.id} actor={a} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState text="Нема актери. Додади барем еден за да стане клиентот активен." />
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="actors"
+          label={mk.brain.actors}
+          fields={ACTOR_FIELDS}
+          items={c.actors}
+          emptyText="Нема актери. Додади барем еден за да стане клиентот активен."
+          renderContent={(a) => (
+            <div>
+              <div className="text-14 font-medium">{a.name}</div>
+              <div className="text-13 text-ink-2">
+                {a.role} · {a.languages.map((l) => mk.lang[l]).join(', ')}
+              </div>
+              {a.canDo.length > 0 && (
+                <div className="text-13">
+                  <span className="text-ink-2">Може: </span>
+                  {a.canDo.join(', ')}
+                </div>
+              )}
+              {a.cannotDo.length > 0 && (
+                <div className="text-13">
+                  <span className="text-ink-2">Не може: </span>
+                  {a.cannotDo.join(', ')}
+                </div>
+              )}
+            </div>
+          )}
+        />
       );
     case 'locations':
-      return c.locations.length ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-          {c.locations.map((l) => (
-            <PlaceCard key={l.id} location={l} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState text="Нема локации." />
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="locations"
+          label={mk.brain.locations}
+          fields={LOCATION_FIELDS}
+          items={c.locations}
+          emptyText="Нема локации."
+          renderContent={(l) => (
+            <div>
+              <div className="text-14 font-medium">{l.name}</div>
+              {l.description && <div className="text-13 text-ink-2">{l.description}</div>}
+              {l.constraints && (
+                <div className="text-13">
+                  <span className="text-ink-2">Ограничувања: </span>
+                  {l.constraints}
+                </div>
+              )}
+            </div>
+          )}
+        />
       );
     case 'competitors':
-      return <SimpleTable rows={c.competitors.map((x) => [x.name, x.why ?? '', x.status])} head={['Конкурент', 'Зошто', 'Статус']} empty="Нема конкуренти." />;
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="competitors"
+          label={mk.brain.competitors}
+          fields={COMPETITOR_FIELDS}
+          items={c.competitors}
+          emptyText="Нема конкуренти."
+          renderContent={(x) => (
+            <div>
+              <div className="flex items-center gap-2 text-14 font-medium">
+                {x.name}
+                <StatusBadge label={x.status === 'CONFIRMED' ? 'потврден' : 'чека потврда'} tone={x.status === 'CONFIRMED' ? 'ok' : 'hold'} />
+              </div>
+              {x.why && <div className="text-13 text-ink-2">{x.why}</div>}
+            </div>
+          )}
+        />
+      );
     case 'references':
-      return <SimpleTable rows={c.references.map((r) => [r.platform ?? '', r.url ?? '', r.flag])} head={['Платформа', 'Линк', 'Флаг']} empty="Нема референци." />;
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="references"
+          label={mk.brain.references}
+          fields={REFERENCE_FIELDS}
+          items={c.references}
+          emptyText="Нема референци."
+          renderContent={(r) => (
+            <div>
+              <div className="text-14 font-medium">
+                {bfOpt[r.flag] ?? r.flag}
+                {r.platform ? ` · ${r.platform}` : ''}
+              </div>
+              {r.url && <div className="truncate text-13 text-ink-2">{r.url}</div>}
+              {r.analysis && <div className="text-13">{r.analysis}</div>}
+            </div>
+          )}
+        />
+      );
     case 'glossary':
-      return <SimpleTable rows={c.glossary.map((g) => [mk.lang[g.language], g.term, g.meaning, g.kind])} head={['Јазик', 'Термин', 'Значење', 'Вид']} empty="Нема термини." />;
+      return (
+        <BrainSection
+          clientId={c.id}
+          entity="glossary"
+          label={mk.brain.glossary}
+          fields={GLOSSARY_FIELDS}
+          items={c.glossary}
+          emptyText="Нема термини."
+          renderContent={(g) => (
+            <div>
+              <div className="text-14 font-medium">
+                {g.term} <span className="text-13 text-ink-2">({mk.lang[g.language]})</span>
+              </div>
+              <div className="text-13 text-ink-2">{g.meaning}</div>
+              <div className="text-13">{bfOpt[g.kind] ?? g.kind}</div>
+            </div>
+          )}
+        />
+      );
     case 'insights':
       return <EmptyState text={mk.brain.insightsEmpty} />;
     default:
@@ -197,24 +374,3 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
   }
 }
 
-function SimpleTable({ head, rows, empty }: { head: string[]; rows: (string | undefined)[][]; empty: string }) {
-  if (rows.length === 0) return <EmptyState text={empty} />;
-  return (
-    <div className="overflow-hidden rounded-sheet border border-rule bg-sheet">
-      <div className="grid gap-4 border-b border-rule px-4 py-2 text-13 text-ink-2" style={{ gridTemplateColumns: `repeat(${head.length}, 1fr)` }}>
-        {head.map((h) => (
-          <span key={h}>{h}</span>
-        ))}
-      </div>
-      {rows.map((r, i) => (
-        <div key={i} className="grid gap-4 border-t border-rule px-4 py-3 text-14" style={{ gridTemplateColumns: `repeat(${head.length}, 1fr)` }}>
-          {r.map((cell, j) => (
-            <span key={j} className={j === 0 ? 'font-medium' : 'text-ink-2'}>
-              {cell ?? ''}
-            </span>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
