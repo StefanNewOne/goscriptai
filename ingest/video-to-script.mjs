@@ -48,7 +48,9 @@ async function withRetry(fn) {
         msg.includes('UNAVAILABLE') ||
         msg.includes('overloaded') ||
         msg.includes('500');
-      if (!retryable || attempt >= 6) throw e;
+      // A per-DAY quota won't recover for hours — fail fast (billing needed).
+      const dailyQuota = /per\s*day/i.test(msg) || msg.includes('PerDay');
+      if (!retryable || dailyQuota || attempt >= 6) throw e;
       const m = msg.match(/retry in ([\d.]+)s/i) || msg.match(/"retryDelay":\s*"(\d+)s"/);
       const delay = m ? Math.ceil(parseFloat(m[1])) + 1 : Math.min(60, 2 ** attempt * 5);
       console.log(`   ⏳ лимит (429) — чекам ${delay}s па пробувам пак (${attempt + 1}/5)…`);
