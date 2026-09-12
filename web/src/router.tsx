@@ -11,7 +11,7 @@ import { Import } from './screens/Import';
 import { Settings } from './screens/Settings';
 import { ScriptsDB } from './screens/ScriptsDB';
 import { Reports } from './screens/Reports';
-import { Placeholder } from './screens/Placeholder';
+import { Results } from './screens/Results';
 import { mk } from './i18n/mk';
 
 export function Router() {
@@ -28,7 +28,7 @@ export function Router() {
         <Route path="/clients/:id" element={<ClientDetail section="overview" />} />
         <Route path="/clients/:id/brain/:tab" element={<ClientDetail section="brain" />} />
         <Route path="/scripts" element={<ScriptsDB />} />
-        <Route path="/results" element={<Placeholder title={mk.nav.results} ticket="GS-F2-02" />} />
+        <Route path="/results" element={<Results />} />
         <Route path="/import" element={<Import />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
