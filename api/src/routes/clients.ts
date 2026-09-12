@@ -10,6 +10,12 @@ import {
   advanceClient,
   suggestCodeForName,
 } from '../services/clientService.js';
+import { ingestExtraction, listPendingMedia } from '../services/ingestService.js';
+
+const ingestSchema = z.object({
+  filename: z.string().min(1),
+  extraction: z.record(z.string(), z.unknown()),
+});
 
 export async function clientRoutes(app: FastifyInstance) {
   // All client routes require an authenticated user.
@@ -25,6 +31,18 @@ export async function clientRoutes(app: FastifyInstance) {
   app.get('/:id/sets', async (req) => {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     return { data: await listClientSets(id) };
+  });
+
+  // Ingestion: local tool POSTs a Gemini extraction → PENDING brain proposals.
+  app.post('/:id/ingest', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const body = ingestSchema.parse(req.body);
+    return reply.status(201).send({ data: await ingestExtraction(id, body.filename, body.extraction) });
+  });
+
+  app.get('/:id/ingest', async (req) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    return { data: await listPendingMedia(id) };
   });
 
   app.get('/suggest-code', async (req) => {
