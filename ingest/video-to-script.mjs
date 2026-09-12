@@ -41,8 +41,14 @@ async function withRetry(fn) {
       return await fn();
     } catch (e) {
       const msg = String(e?.message ?? e);
-      const is429 = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      if (!is429 || attempt >= 5) throw e;
+      const retryable =
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED') ||
+        msg.includes('503') ||
+        msg.includes('UNAVAILABLE') ||
+        msg.includes('overloaded') ||
+        msg.includes('500');
+      if (!retryable || attempt >= 6) throw e;
       const m = msg.match(/retry in ([\d.]+)s/i) || msg.match(/"retryDelay":\s*"(\d+)s"/);
       const delay = m ? Math.ceil(parseFloat(m[1])) + 1 : Math.min(60, 2 ** attempt * 5);
       console.log(`   ⏳ лимит (429) — чекам ${delay}s па пробувам пак (${attempt + 1}/5)…`);
@@ -186,8 +192,12 @@ function renderMarkdown(d, base) {
   const t = b.tags ?? {};
   L.push(`- **Тагови:** тип: ${t.videoType ?? '—'} · тема: ${(t.topic ?? []).join(', ') || '—'} · хоок: ${t.hookType ?? '—'} · цел: ${t.ctaGoal ?? '—'}${(t.extra ?? []).length ? ` · +${t.extra.join(', ')}` : ''}`);
   for (const m of b.productMentions ?? []) L.push(`- **Продукт:** ${m.name} — ${m.essence}${m.quote ? `  \n  „${m.quote}"` : ''}`);
-  const ah = b.actorHint ?? {};
-  L.push(`- **Актер (насока):** ${[ah.gender, ah.ageRange, ah.look].filter(Boolean).join(', ') || '—'}`);
+  const actors = b.actors ?? (b.actorHint ? [b.actorHint] : []);
+  if (actors.length === 0) L.push('- **Актери (насока):** —');
+  else
+    actors.forEach((a, i) =>
+      L.push(`- **Актер${actors.length > 1 ? ' ' + (i + 1) : ''} (насока):** ${[a.gender, a.ageRange, a.look].filter(Boolean).join(', ') || '—'}`),
+    );
   L.push(`- **Аватар на купувач:** ${b.buyerAvatar?.persona ?? '—'}`);
   if (d.extraction?.assumptions) L.push(`- **Претпоставки:** ${d.extraction.assumptions}`);
   return L.join('\n') + '\n';

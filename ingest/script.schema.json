@@ -51,7 +51,7 @@
       "type": "object",
       "description": "ПРЕДЛОЗИ за Мозокот — човек ги потврдува. Не се вистина.",
       "additionalProperties": false,
-      "required": ["tags", "productMentions", "actorHint", "buyerAvatar"],
+      "required": ["tags", "productMentions", "actors", "buyerAvatar"],
       "properties": {
         "tags": {
           "type": "object",
@@ -79,15 +79,18 @@
             }
           }
         },
-        "actorHint": {
-          "type": "object",
-          "description": "Кратка насока за лицето на екран (за мапирање + еднократно збогатување на записот Актер).",
-          "additionalProperties": false,
-          "required": ["gender", "ageRange", "look"],
-          "properties": {
-            "gender": { "type": "string", "description": "машки/женски/друго." },
-            "ageRange": { "type": "string", "description": "Приближна возраст (пр. 18-25, 25-35)." },
-            "look": { "type": "string", "description": "Краток опис на изглед/енергија (пр. модерна, лежерна, професионална)." }
+        "actors": {
+          "type": "array",
+          "description": "По еден запис за секое лице што се појавува/зборува (за мапирање + еднократно збогатување на записот Актер).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gender", "ageRange", "look"],
+            "properties": {
+              "gender": { "type": "string", "description": "машки/женски/друго." },
+              "ageRange": { "type": "string", "description": "Приближна возраст (пр. 18-25, 25-35)." },
+              "look": { "type": "string", "description": "Краток опис на изглед/енергија (пр. модерна, лежерна, професионална)." }
+            }
           }
         },
         "buyerAvatar": {
