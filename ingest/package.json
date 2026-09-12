@@ -6,6 +6,7 @@
   "description": "Local ingestion tool — video → script via Gemini. Standalone (not part of the api/web workspaces).",
   "scripts": {
     "video": "node --env-file=.env video-to-script.mjs",
+    "push": "node --env-file=.env push-existing.mjs",
     "models": "node --env-file=.env list-models.mjs"
   },
   "dependencies": {
