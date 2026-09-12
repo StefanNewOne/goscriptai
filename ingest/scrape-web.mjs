@@ -17,7 +17,10 @@ if (!clientCode) fail('--client=КОД недостасува.');
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) fail('GEMINI_API_KEY недостасува во .env.');
-const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const models = (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-3.6-flash')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 const apiUrl = process.env.API_URL || 'http://localhost:3011/api/v1';
 const email = process.env.INGEST_EMAIL;
 const password = process.env.INGEST_PASSWORD;
@@ -40,16 +43,32 @@ let text = html
   .replace(/\s+/g, ' ')
   .trim();
 if (text.length > 120000) text = text.slice(0, 120000);
-console.log(`Содржина: ${text.length} знаци. Извлекувам продукти со ${model}…`);
+console.log(`Содржина: ${text.length} знаци. Извлекувам продукти (${models.join(', ')})…`);
 
 const ai = new GoogleGenAI({ apiKey });
 const prompt =
   'Ти е дадена содржина од веб-страница на бизнис. Извлечи ги САМО вистинските ПРОДУКТИ/УСЛУГИ што ги продава — НЕ навигација, копчиња, реклами, footer, категории без производ. За секој врати: name (име), category (категорија ако е јасна), price (број во денари САМО ако е јасно наведена; изостави го полето ако не е), essence (кратко: што е и зошто е важно). Врати САМО валиден JSON: {"products":[{"name":"","category":"","price":0,"essence":""}]}. Ако нема продукти врати {"products":[]}. Содржина:\n\n' +
   text;
 
+let res;
+for (const m of models) {
+  try {
+    res = await ai.models.generateContent({ model: m, contents: prompt, config: { responseMimeType: 'application/json' } });
+    break;
+  } catch (e) {
+    const msg = String(e?.message ?? e);
+    const daily = /per\s*day/i.test(msg) || msg.includes('PerDay');
+    if (daily) {
+      console.log(`↪ ${m} го удри дневниот лимит, пробувам следен…`);
+      continue;
+    }
+    fail('Извлекувањето не успеа: ' + msg);
+  }
+}
+if (!res) fail('Сите модели го удрија дневниот лимит. Пробај подоцна или вклучи billing.');
+
 let parsed;
 try {
-  const res = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: 'application/json' } });
   const t = res.text ?? '';
   parsed = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));
 } catch (e) {
