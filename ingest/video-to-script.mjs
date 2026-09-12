@@ -75,7 +75,13 @@ if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) fail(`Фолд
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) fail('GEMINI_API_KEY недостасува. Копирај .env.example во .env и внеси клуч.');
-const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// One or more models (comma-separated in GEMINI_MODELS). On a per-DAY free-tier
+// quota, the tool rotates to the next model automatically.
+const models = (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || 'gemini-3.6-flash')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+let modelIdx = 0;
 
 const systemInstruction = fs.readFileSync(path.join(__dirname, 'prompt.txt'), 'utf8');
 const ai = new GoogleGenAI({ apiKey });
@@ -115,7 +121,7 @@ if (videos.length === 0) fail('Нема видеа во фолдерот (mp4/mo
 const outDir = path.join(folder, OUT_DIR_NAME);
 fs.mkdirSync(outDir, { recursive: true });
 
-console.log(`Модел: ${model}\nВидеа: ${videos.length}\nИзлез: ${outDir}\n`);
+console.log(`Модели: ${models.join(', ')}\nВидеа: ${videos.length}\nИзлез: ${outDir}\n`);
 
 let done = 0;
 let skipped = 0;
@@ -145,19 +151,36 @@ for (const name of videos) {
     }
     if (file.state === 'FAILED') throw new Error('Gemini не го обработи видеото (state=FAILED).');
 
-    console.log(`   обработувам со ${model}…`);
-    const response = await withRetry(() =>
-      ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ fileData: { fileUri: file.uri, mimeType: file.mimeType } }, { text: 'Обработи го видеото.' }],
-          },
-        ],
-        config: { systemInstruction, responseMimeType: 'application/json' },
-      }),
-    );
+    // Generate; on a per-day free-tier quota, rotate to the next model and retry
+    // the same (already-uploaded) video.
+    let response;
+    for (;;) {
+      console.log(`   обработувам со ${models[modelIdx]}…`);
+      try {
+        response = await withRetry(() =>
+          ai.models.generateContent({
+            model: models[modelIdx],
+            contents: [
+              {
+                role: 'user',
+                parts: [{ fileData: { fileUri: file.uri, mimeType: file.mimeType } }, { text: 'Обработи го видеото.' }],
+              },
+            ],
+            config: { systemInstruction, responseMimeType: 'application/json' },
+          }),
+        );
+        break;
+      } catch (e) {
+        const msg = String(e?.message ?? e);
+        const daily = /per\s*day/i.test(msg) || msg.includes('PerDay');
+        if (daily && modelIdx < models.length - 1) {
+          modelIdx++;
+          console.log(`   ↪ дневен лимит — префрлам на ${models[modelIdx]}`);
+          continue;
+        }
+        throw e;
+      }
+    }
 
     const parsed = parseJson(response.text);
     fs.writeFileSync(outJson, JSON.stringify(parsed, null, 2), 'utf8');
