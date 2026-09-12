@@ -33,6 +33,24 @@ const MIME = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Retry on 429 (rate limit) honoring the server's retryDelay. Caps attempts so
+// a hard quota (free-tier limit 0) fails fast instead of looping forever.
+async function withRetry(fn) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = String(e?.message ?? e);
+      const is429 = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if (!is429 || attempt >= 5) throw e;
+      const m = msg.match(/retry in ([\d.]+)s/i) || msg.match(/"retryDelay":\s*"(\d+)s"/);
+      const delay = m ? Math.ceil(parseFloat(m[1])) + 1 : Math.min(60, 2 ** attempt * 5);
+      console.log(`   ⏳ лимит (429) — чекам ${delay}s па пробувам пак (${attempt + 1}/5)…`);
+      await sleep(delay * 1000);
+    }
+  }
+}
+
 function fail(msg) {
   console.error('❌ ' + msg);
   process.exit(1);
@@ -82,7 +100,7 @@ for (const name of videos) {
   try {
     fs.copyFileSync(full, tmp);
     console.log(`▶  ${name} — качувам…`);
-    let file = await ai.files.upload({ file: tmp, config: { mimeType, displayName: `video${ext}` } });
+    let file = await withRetry(() => ai.files.upload({ file: tmp, config: { mimeType, displayName: `video${ext}` } }));
     while (file.state === 'PROCESSING') {
       await sleep(5000);
       file = await ai.files.get({ name: file.name });
@@ -90,16 +108,18 @@ for (const name of videos) {
     if (file.state === 'FAILED') throw new Error('Gemini не го обработи видеото (state=FAILED).');
 
     console.log(`   обработувам со ${model}…`);
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        {
-          role: 'user',
-          parts: [{ fileData: { fileUri: file.uri, mimeType: file.mimeType } }, { text: 'Обработи го видеото.' }],
-        },
-      ],
-      config: { systemInstruction, responseMimeType: 'application/json' },
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ fileData: { fileUri: file.uri, mimeType: file.mimeType } }, { text: 'Обработи го видеото.' }],
+          },
+        ],
+        config: { systemInstruction, responseMimeType: 'application/json' },
+      }),
+    );
 
     const parsed = parseJson(response.text);
     fs.writeFileSync(outJson, JSON.stringify(parsed, null, 2), 'utf8');
