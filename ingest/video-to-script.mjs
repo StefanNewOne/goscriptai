@@ -62,7 +62,7 @@ if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) fail(`Фолд
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) fail('GEMINI_API_KEY недостасува. Копирај .env.example во .env и внеси клуч.');
-const model = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
+const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 const systemInstruction = fs.readFileSync(path.join(__dirname, 'prompt.txt'), 'utf8');
 const ai = new GoogleGenAI({ apiKey });
