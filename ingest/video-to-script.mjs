@@ -10,6 +10,7 @@
 // Idempotent: skips a video whose .json already exists. One failure doesn't
 // stop the batch. The Gemini model is read from GEMINI_MODEL (env).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI } from '@google/genai';
@@ -43,7 +44,7 @@ if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) fail(`Фолд
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) fail('GEMINI_API_KEY недостасува. Копирај .env.example во .env и внеси клуч.');
-const model = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+const model = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
 
 const systemInstruction = fs.readFileSync(path.join(__dirname, 'prompt.txt'), 'utf8');
 const ai = new GoogleGenAI({ apiKey });
@@ -72,11 +73,16 @@ for (const name of videos) {
     console.log(`⏭  ${name} — веќе обработено`);
     continue;
   }
+  const ext = path.extname(name).toLowerCase();
   const full = path.join(folder, name);
-  const mimeType = MIME[path.extname(name).toLowerCase()];
+  const mimeType = MIME[ext];
+  // The upload puts the file name into an HTTP header (ASCII only); Cyrillic /
+  // emoji names break it. Copy to an ASCII temp path and upload that instead.
+  const tmp = path.join(os.tmpdir(), `gsi_${Date.now()}_${done + failed + skipped}${ext}`);
   try {
+    fs.copyFileSync(full, tmp);
     console.log(`▶  ${name} — качувам…`);
-    let file = await ai.files.upload({ file: full, config: { mimeType } });
+    let file = await ai.files.upload({ file: tmp, config: { mimeType, displayName: `video${ext}` } });
     while (file.state === 'PROCESSING') {
       await sleep(5000);
       file = await ai.files.get({ name: file.name });
@@ -109,6 +115,12 @@ for (const name of videos) {
   } catch (e) {
     failed++;
     console.error(`❌ ${name}: ${e?.message ?? e}`);
+  } finally {
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
