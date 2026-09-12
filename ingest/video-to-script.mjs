@@ -62,7 +62,12 @@ function fail(msg) {
   process.exit(1);
 }
 
-const folder = process.argv[2];
+const rawArgs = process.argv.slice(2);
+const flags = rawArgs.filter((a) => a.startsWith('--'));
+const folder = rawArgs.find((a) => !a.startsWith('--'));
+const push = flags.includes('--push');
+const clientCode = flags.find((a) => a.startsWith('--client='))?.split('=')[1] ?? null;
+
 if (!folder) fail('Патека до фолдер со видеа недостасува.\n   Пример: npm run video -- "C:\\...\\Surovi videoa\\КЛИЕНТ"');
 if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) fail(`Фолдерот не постои: ${folder}`);
 
@@ -72,6 +77,31 @@ const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 const systemInstruction = fs.readFileSync(path.join(__dirname, 'prompt.txt'), 'utf8');
 const ai = new GoogleGenAI({ apiKey });
+
+// --push: after each video, send the extraction to GoScriptAI (PENDING brain).
+// Resolves the client by CODE via the API. Needs API_URL + INGEST_EMAIL/PASSWORD.
+let pushCtx = null;
+if (push) {
+  if (!clientCode) fail('--push бара --client=КОД (пр. --client=GODIGITAL).');
+  const apiUrl = process.env.API_URL || 'http://localhost:3011/api/v1';
+  const email = process.env.INGEST_EMAIL;
+  const password = process.env.INGEST_PASSWORD;
+  if (!email || !password) fail('За --push треба INGEST_EMAIL и INGEST_PASSWORD во .env.');
+  const login = await (
+    await fetch(`${apiUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  ).json();
+  const token = login?.data?.token;
+  if (!token) fail('Најавата за --push не успеа — провери INGEST_EMAIL/INGEST_PASSWORD.');
+  const clients = (await (await fetch(`${apiUrl}/clients`, { headers: { Authorization: `Bearer ${token}` } })).json())?.data ?? [];
+  const client = clients.find((c) => c.code === clientCode);
+  if (!client) fail(`Нема клиент со код „${clientCode}" во системот. Креирај го прво во UI.`);
+  pushCtx = { apiUrl, token, clientId: client.id };
+  console.log(`Push → клиент ${clientCode} (${client.id})`);
+}
 
 const videos = fs
   .readdirSync(folder)
@@ -130,6 +160,18 @@ for (const name of videos) {
     const parsed = parseJson(response.text);
     fs.writeFileSync(outJson, JSON.stringify(parsed, null, 2), 'utf8');
     fs.writeFileSync(path.join(outDir, `${base}.md`), renderMarkdown(parsed, base), 'utf8');
+    if (pushCtx) {
+      try {
+        const pr = await fetch(`${pushCtx.apiUrl}/clients/${pushCtx.clientId}/ingest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pushCtx.token}` },
+          body: JSON.stringify({ filename: name, extraction: parsed }),
+        });
+        console.log(pr.ok ? '   ↑ пратено во Мозокот' : `   ⚠ push не успеа (${pr.status})`);
+      } catch (e) {
+        console.log(`   ⚠ push грешка: ${e?.message ?? e}`);
+      }
+    }
     // Tidy up the uploaded file on Gemini's side (best-effort).
     try {
       await ai.files.delete({ name: file.name });
