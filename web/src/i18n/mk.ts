@@ -81,6 +81,11 @@ export const mk = {
     reject: 'Одбиј',
     confirmedScript: 'Потврдено — сценарио',
     rejected: 'Одбиено',
+    showFull: 'Прикажи цело сценарио',
+    hide: 'Сокриј',
+    cta: 'ЦТА',
+    captions: 'Caption',
+    productionNote: 'Продукциска забелешка',
   },
   results: {
     comingWithMeta: 'Резултатите доаѓаат со Meta интеграцијата (Фаза 2).',
