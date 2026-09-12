@@ -130,3 +130,35 @@ export async function rejectMedia(mediaId: string) {
   await prisma.mention.updateMany({ where: { mediaId }, data: { status: 'REJECTED' } });
   return { ok: true };
 }
+
+// Web scrape → product catalog PROPOSALS (confirmed=false). Essence-focused;
+// the scriptwriter confirms in the Products tab. Price is a hint, not truth.
+export async function ingestProducts(
+  clientId: string,
+  products: { name?: string; category?: string; price?: number; essence?: string }[],
+) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new AppError('NOT_FOUND', 'Клиентот не постои.');
+  let created = 0;
+  for (const p of products) {
+    if (!p?.name) continue;
+    await prisma.product.create({
+      data: {
+        clientId,
+        name: p.name,
+        category: p.category ?? null,
+        price: p.price != null ? p.price : null,
+        usp: p.essence ?? null,
+        confirmed: false,
+        active: true,
+      },
+    });
+    created++;
+  }
+  if (created > 0) {
+    await prisma.brainChange.create({
+      data: { clientId, kind: 'Продукт', summary: `Предложени ${created} продукти од веб (чекаат потврда).` },
+    });
+  }
+  return { created };
+}

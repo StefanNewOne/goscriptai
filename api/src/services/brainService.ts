@@ -117,5 +117,8 @@ export async function confirmCompetitor(id: string) {
 export async function confirmAvatar(id: string) {
   return prisma.avatar.update({ where: { id }, data: { status: 'ACTIVE' } });
 }
+export async function confirmProduct(id: string) {
+  return prisma.product.update({ where: { id }, data: { confirmed: true } });
+}
 
 export const _idParam = z.object({ id: z.string() });

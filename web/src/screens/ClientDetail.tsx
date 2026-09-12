@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, NavLink } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { ClientDetail as ClientDetailT } from '../lib/types';
+import type { ClientDetail as ClientDetailT, Product } from '../lib/types';
 import { mk } from '../i18n/mk';
 import { StatusBadge } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
@@ -295,6 +295,38 @@ const GLOSSARY_FIELDS: FieldDef[] = [
   },
 ];
 
+// Product row content — shows a "чека потврда" badge + Потврди for scraped
+// proposals (confirmed=false), so the catalog stays human-confirmed.
+function ProductContent({ product: p, clientId }: { product: Product; clientId: string }) {
+  const qc = useQueryClient();
+  const confirm = useMutation({
+    mutationFn: () => api.post(`/products/${p.id}/confirm`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client', clientId] }),
+  });
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-14 font-medium">
+        {p.name}
+        {!p.active && <span className="text-13 font-normal text-ink-2">(неактивен)</span>}
+        {!p.confirmed && <StatusBadge label={mk.brain.pending} tone="hold" />}
+      </div>
+      <div className="text-13 text-ink-2">
+        {[p.category, p.price ? `${p.price} ден.` : null, p.installment ? `рата ${p.installment}` : null].filter(Boolean).join(' · ')}
+      </div>
+      {p.usp && <div className="text-13">{p.usp}</div>}
+      {!p.confirmed && (
+        <button
+          className="mt-2 h-8 rounded-control bg-signal px-3 text-13 font-semibold text-white hover:bg-signal-hover disabled:opacity-50"
+          onClick={() => confirm.mutate()}
+          disabled={confirm.isPending}
+        >
+          {mk.brain.confirm}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
   switch (tab) {
     case 'profile': {
@@ -328,18 +360,7 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
           fields={PRODUCT_FIELDS}
           items={c.products}
           emptyText="Нема продукти."
-          renderContent={(p) => (
-            <div>
-              <div className="text-14 font-medium">
-                {p.name}
-                {!p.active && <span className="ml-2 text-13 text-ink-2">(неактивен)</span>}
-              </div>
-              <div className="text-13 text-ink-2">
-                {[p.category, p.price ? `${p.price} ден.` : null, p.installment ? `рата ${p.installment}` : null].filter(Boolean).join(' · ')}
-              </div>
-              {p.usp && <div className="text-13">{p.usp}</div>}
-            </div>
-          )}
+          renderContent={(p) => <ProductContent product={p} clientId={c.id} />}
         />
       );
     case 'actors':

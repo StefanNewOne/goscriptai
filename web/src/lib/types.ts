@@ -38,6 +38,7 @@ export interface Product {
   installment?: string | null;
   usp?: string | null;
   active: boolean;
+  confirmed: boolean;
 }
 
 export interface Actor {

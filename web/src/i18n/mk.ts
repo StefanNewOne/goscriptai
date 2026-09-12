@@ -69,6 +69,8 @@ export const mk = {
     glossary: 'Речник',
     insights: 'Инсајти',
     insightsEmpty: 'Инсајтите доаѓаат со резултатите од рекламите (Фаза 2).',
+    pending: 'чека потврда',
+    confirm: 'Потврди',
   },
   ingest: {
     title: 'Полнење — чека потврда',

@@ -20,6 +20,10 @@ export async function brainRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params);
     return { data: await brain.updateProduct(id, req.body) };
   });
+  app.post('/products/:id/confirm', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await brain.confirmProduct(id) };
+  });
   app.delete('/products/:id', write, async (req) => {
     const { id } = idParam.parse(req.params);
     await brain.deleteProduct(id);

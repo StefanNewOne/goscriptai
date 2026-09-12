@@ -10,11 +10,28 @@ import {
   advanceClient,
   suggestCodeForName,
 } from '../services/clientService.js';
-import { ingestExtraction, listPendingMedia, confirmMedia, rejectMedia } from '../services/ingestService.js';
+import {
+  ingestExtraction,
+  listPendingMedia,
+  confirmMedia,
+  rejectMedia,
+  ingestProducts,
+} from '../services/ingestService.js';
 
 const ingestSchema = z.object({
   filename: z.string().min(1),
   extraction: z.record(z.string(), z.unknown()),
+});
+
+const productsIngestSchema = z.object({
+  products: z.array(
+    z.object({
+      name: z.string().min(1),
+      category: z.string().optional(),
+      price: z.number().optional(),
+      essence: z.string().optional(),
+    }),
+  ),
 });
 
 export async function clientRoutes(app: FastifyInstance) {
@@ -53,6 +70,13 @@ export async function clientRoutes(app: FastifyInstance) {
   app.post('/:id/ingest/:mediaId/reject', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req) => {
     const { mediaId } = mediaParam.parse(req.params);
     return { data: await rejectMedia(mediaId) };
+  });
+
+  // Web scrape → product proposals (confirmed=false).
+  app.post('/:id/products/ingest', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const body = productsIngestSchema.parse(req.body);
+    return reply.status(201).send({ data: await ingestProducts(id, body.products) });
   });
 
   app.get('/suggest-code', async (req) => {
