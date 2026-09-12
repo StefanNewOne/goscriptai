@@ -136,6 +136,9 @@ model Client {
   agentRuns   AgentRun[]
   approvals   Approval[]
   costEntries CostEntry[]
+  mediaAssets MediaAsset[]
+  mentions    Mention[]
+  tags        Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -217,6 +220,8 @@ model Product {
   promoFrom   DateTime?
   promoTo     DateTime?
   active      Boolean   @default(true)
+  confirmed   Boolean   @default(true) // false = AI-proposed, awaiting scriptwriter confirmation
+  mentions    Mention[]
 
   @@index([clientId])
 }
@@ -365,6 +370,7 @@ model Script {
   embedding     Unsupported("vector(1536)")?
   adCreatives   AdCreative[]
   versions      ScriptVersion[]
+  mediaAsset    MediaAsset?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -510,4 +516,68 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ── Ingestion (video/graphics/web → brain proposals, human-confirmed) ────
+enum MediaKind {
+  VIDEO
+  GRAPHIC
+}
+
+enum IngestStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+// A source asset (a video) and its extracted script + brain proposals. The
+// full Gemini output is kept in `extraction`; a confirmed asset links to the
+// IMPORTED Script it produced.
+model MediaAsset {
+  id         String       @id @default(cuid())
+  clientId   String
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  kind       MediaKind    @default(VIDEO)
+  filename   String
+  extraction Json // full Gemini output: { script, brain, extraction }
+  status     IngestStatus @default(PENDING)
+  scriptId   String?      @unique
+  script     Script?      @relation(fields: [scriptId], references: [id])
+  mentions   Mention[]
+  createdAt  DateTime     @default(now())
+
+  @@index([clientId, status])
+}
+
+// What was SAID about a product/service in a video — essence, not catalog
+// truth. Kept separate from Product to avoid treating marketing claims as specs.
+model Mention {
+  id        String       @id @default(cuid())
+  clientId  String
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mediaId   String?
+  media     MediaAsset?  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product?     @relation(fields: [productId], references: [id])
+  name      String
+  essence   String
+  quote     String?
+  status    IngestStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  @@index([clientId, status])
+}
+
+// Per-client tag vocabulary (curated). Dimension: videoType | topic | hookType
+// | ctaGoal | extra.
+model Tag {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  dimension String
+  value     String
+  createdAt DateTime @default(now())
+
+  @@unique([clientId, dimension, value])
+  @@index([clientId])
 }
