@@ -111,8 +111,96 @@ function Overview({ c }: { c: ClientDetailT }) {
         )}
       </section>
       </div>
+      <ClientSets clientId={c.id} clientCode={c.code} />
     </div>
   );
+}
+
+interface ClientSetSummary {
+  id: string;
+  yymm: string;
+  status: string;
+  requested: number;
+  concepts: { id: string; type: string; decision: string; hook: string }[];
+  scripts: { id: string; code: string; title: string; type: string; status: string; conceptId: string | null }[];
+}
+
+const SET_STATUS: Record<string, string> = {
+  DRAFT: 'Нацрт',
+  CONCEPTS_GENERATING: 'Се генерираат концепти',
+  CONCEPTS_REVIEW: 'Концепти за избор',
+  SCRIPTS_WRITING: 'Се пишуваат',
+  CRITIC_RUNNING: 'Во критика',
+  SCRIPTS_REVIEW: 'За одобрување',
+  APPROVED: 'Одобрено',
+  EXPORTED: 'Експортирано',
+  PAUSED: 'Паузирано',
+  FAILED: 'Падна',
+  BUDGET_HOLD: 'Буџет',
+};
+
+// Client-level traceability: which sets exist, which concepts were chosen, and
+// which script came from which concept. Read-only view over /clients/:id/sets.
+function ClientSets({ clientId, clientCode }: { clientId: string; clientCode: string }) {
+  const { data: sets } = useQuery({
+    queryKey: ['client', clientId, 'sets'],
+    queryFn: () => api.get<ClientSetSummary[]>(`/clients/${clientId}/sets`),
+  });
+  if (!sets) return null;
+
+  return (
+    <section className="mt-5 rounded-sheet border border-rule bg-sheet">
+      <h2 className="border-b border-rule px-4 py-3 text-14 font-medium">{mk.client.sets}</h2>
+      {sets.length === 0 ? (
+        <p className="px-4 py-4 text-13 text-ink-2">{mk.client.noSets}</p>
+      ) : (
+        sets.map((s) => {
+          const selected = s.concepts.filter((c) => c.decision === 'SELECTED');
+          const rejected = s.concepts.filter((c) => c.decision === 'REJECTED');
+          const hookOf = (conceptId: string | null) => s.concepts.find((c) => c.id === conceptId)?.hook ?? '';
+          return (
+            <div key={s.id} className="border-t border-rule px-4 py-3">
+              <div className="mb-2 flex items-center gap-3">
+                <span className="font-mono text-14">
+                  {clientCode}-{s.yymm}
+                </span>
+                <StatusBadge label={SET_STATUS[s.status] ?? s.status} tone={setTone(s.status)} />
+                <span className="text-13 text-ink-2">
+                  {mk.client.selectedN} {selected.length}
+                  {rejected.length > 0 ? ` · ${mk.client.rejectedN} ${rejected.length}` : ''}
+                </span>
+                <Link to={`/sets/${s.id}`} className="ml-auto text-13 underline underline-offset-2 hover:text-ink">
+                  {mk.client.openSet}
+                </Link>
+              </div>
+              {s.scripts.length > 0 && (
+                <ul className="flex flex-col gap-1">
+                  {s.scripts.map((sc) => (
+                    <li key={sc.id} className="flex flex-wrap items-baseline gap-2 text-13">
+                      <span className="font-mono text-ink-2">{sc.code.split('-').pop()}</span>
+                      <span>{sc.title}</span>
+                      {hookOf(sc.conceptId) && (
+                        <span className="text-ink-2">
+                          — {mk.client.fromConcept}: „{hookOf(sc.conceptId).slice(0, 48)}…"
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })
+      )}
+    </section>
+  );
+}
+
+function setTone(s: string): 'ok' | 'hold' | 'signal' | 'neutral' {
+  if (['CONCEPTS_REVIEW', 'SCRIPTS_REVIEW'].includes(s)) return 'signal';
+  if (['APPROVED', 'EXPORTED'].includes(s)) return 'ok';
+  if (['FAILED', 'BUDGET_HOLD', 'PAUSED'].includes(s)) return 'hold';
+  return 'neutral';
 }
 
 function Brain({ c, tab }: { c: ClientDetailT; tab: string }) {

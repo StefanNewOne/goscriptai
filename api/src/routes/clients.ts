@@ -4,6 +4,7 @@ import { createClientSchema, updateClientSchema } from '../schemas/client.js';
 import {
   listClients,
   getClient,
+  listClientSets,
   createClient,
   updateClient,
   advanceClient,
@@ -19,6 +20,11 @@ export async function clientRoutes(app: FastifyInstance) {
   app.get('/:id', async (req) => {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     return { data: await getClient(id) };
+  });
+
+  app.get('/:id/sets', async (req) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    return { data: await listClientSets(id) };
   });
 
   app.get('/suggest-code', async (req) => {

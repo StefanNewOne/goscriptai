@@ -19,6 +19,7 @@ interface Script {
   type: string;
   status: string;
   version: number;
+  conceptId?: string | null;
   content: ScriptContent;
   criticReport?: CriticReport | null;
 }
@@ -178,6 +179,14 @@ function Scripts({ set }: { set: SetData }) {
 
       {/* script */}
       <div className="min-w-[460px] flex-1">
+        {(() => {
+          const hook = set.concepts.find((c) => c.id === current.conceptId)?.card.hook;
+          return hook ? (
+            <p className="mb-2 text-13 text-ink-2">
+              Од концепт: „{hook.slice(0, 60)}…"
+            </p>
+          ) : null;
+        })()}
         {editing ? (
           <ScriptEditor
             content={current.content}

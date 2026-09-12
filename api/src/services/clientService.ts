@@ -31,6 +31,38 @@ export async function getClient(id: string) {
   return client;
 }
 
+// Read-only summary of a client's sets with concept decisions and the scripts
+// written, for client-level traceability (which concepts were chosen, and which
+// script came from which concept). No status changes.
+export async function listClientSets(id: string) {
+  await getClient(id); // 404 if the client doesn't exist
+  const sets = await prisma.scriptSet.findMany({
+    where: { clientId: id },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      concepts: { select: { id: true, type: true, decision: true, card: true } },
+      scripts: {
+        select: { id: true, code: true, title: true, type: true, status: true, conceptId: true },
+        orderBy: { code: 'asc' },
+      },
+    },
+  });
+  return sets.map((s) => ({
+    id: s.id,
+    yymm: s.yymm,
+    status: s.status,
+    requested: s.requested,
+    createdAt: s.createdAt,
+    concepts: s.concepts.map((c) => ({
+      id: c.id,
+      type: c.type,
+      decision: c.decision,
+      hook: (c.card as { hook?: string } | null)?.hook ?? '',
+    })),
+    scripts: s.scripts,
+  }));
+}
+
 export async function createClient(input: CreateClientInput) {
   const code = input.code ?? suggestClientCode(input.name);
   if (!isValidClientCode(code)) {

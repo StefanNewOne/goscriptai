@@ -50,6 +50,13 @@ export const mk = {
     whatsNew: 'Што е ново',
     avatarCoverage: 'Покриеност на аватари',
     newSet: 'Нов сет',
+    openSet: 'Отвори',
+    selectedN: 'Избрани',
+    rejectedN: 'Одбиени',
+    fromConcept: 'од концепт',
+    noSets: 'Нема сетови сè уште.',
+    concepts: 'Концепти',
+    scripts: 'Сценарија',
   },
   brain: {
     profile: 'Профил',
