@@ -32,9 +32,14 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
     const run = await startRun({ clientId: client.id, agentKind: 'client_analyst', model: routing.model, scope, scopeId: client.id });
     await recordMessage(run.id, 'system', { system }, scope, client.id);
 
+    // Full scraped site text (from the ingest scraper) is the analyst's main
+    // source when present — richer profile, fewer questions.
+    const site = client.websiteText
+      ? `\n\nТЕКСТ ОД ВЕБ-САЈТОТ НА КЛИЕНТОТ (главен извор за фактите):\n${client.websiteText.slice(0, 60000)}`
+      : '';
     try {
       if (job.phase === 'research') {
-        const prompt = `Истражи го клиентот „${client.name}“ (индустрија: ${client.industry ?? 'непозната'}). Постави 3–5 конкретни прашања до операторот таму каде податокот недостасува, во бараниот JSON облик.`;
+        const prompt = `Истражи го клиентот „${client.name}“ (индустрија: ${client.industry ?? 'непозната'}).${site}\nПостави 3–5 конкретни прашања до операторот САМО за она што НЕ е јасно од сајтот, во бараниот JSON облик.`;
         await recordMessage(run.id, 'user', { prompt }, scope, client.id);
         let sessionId: string | undefined;
         let questions;
@@ -59,7 +64,7 @@ export async function runOnboardingJob(job: OnboardingJob): Promise<void> {
         const prior = await prisma.agentRun.findFirst({ where: { clientId: client.id, agentKind: 'client_analyst', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } });
         const prompt = job.comment
           ? `Ревидирај го профилот според коментарот: „${job.comment}“. Задржи ги одговорите: ${JSON.stringify(answers)}`
-          : `Состави ClientProfile.md од одговорите на операторот: ${JSON.stringify(answers)}. Врати markdown + структурирани податоци во бараниот JSON облик.`;
+          : `Состави богат ClientProfile.md од одговорите на операторот: ${JSON.stringify(answers)}.${site}\nВклучи јасно: индустрија, продукти/услуги, УСП и позиционирање, ТОН НА ГЛАС и претпочитани/забранети зборови, ЦЕЛНА ПУБЛИКА (за аватари), и ТЕСТИМОНИЈАЛИ/резултати ако ги има во текстот. Врати markdown + структурирани податоци во бараниот JSON облик.`;
         let sessionId: string | undefined;
         let profile;
         let costUsd = isStubMode() ? 0.03 : 0;
