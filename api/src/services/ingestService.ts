@@ -1,5 +1,8 @@
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
+import { commit } from './importService.js';
+import { isFrameRole, type Frame, type ScriptContent } from '../domain/scriptFormat.js';
+import type { ScriptType } from '../domain/types.js';
 
 // Receives a Gemini video→script extraction and stores it as PENDING brain
 // proposals — a MediaAsset (the full extraction), Mentions (what was said about
@@ -63,4 +66,67 @@ export async function listPendingMedia(clientId: string) {
     orderBy: { createdAt: 'desc' },
     include: { mentions: true },
   });
+}
+
+function mapType(videoType?: string): ScriptType {
+  const v = (videoType ?? '').toLowerCase();
+  if (v.includes('продаж')) return 'PRODUCT_OFFER';
+  if (v.includes('тестимон')) return 'TESTIMONIAL';
+  if (v.includes('скеч')) return 'SKETCH';
+  return 'EDUCATIONAL';
+}
+
+interface ShotIn {
+  role?: string;
+  description?: string;
+  onScreenText?: string;
+  actor?: string;
+  line?: string;
+}
+
+function mapShot(sh: ShotIn): Frame {
+  return {
+    role: isFrameRole(sh?.role ?? '') ? (sh.role as Frame['role']) : 'БОДИ',
+    direction: sh?.description ?? '',
+    lines: sh?.line ? [{ actor: sh.actor || 'Актер', text: sh.line }] : [],
+    ...(sh?.onScreenText ? { subLabel: `Текст на екран: ${sh.onScreenText}` } : {}),
+  };
+}
+
+// Confirm a PENDING media asset: create the IMPORTED Script from its extraction
+// (a format-profile example), mark its mentions CONFIRMED, and log the change.
+export async function confirmMedia(mediaId: string) {
+  const media = await prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+  if (!media) throw new AppError('NOT_FOUND', 'Медиумот не постои.');
+  if (media.status !== 'PENDING') throw new AppError('WRONG_STATUS', 'Веќе обработено.');
+
+  const ex = media.extraction as {
+    script?: { title?: string; shots?: ShotIn[] };
+    brain?: { tags?: { videoType?: string } };
+  };
+  const s = ex.script ?? {};
+  const content: ScriptContent = { frames: (s.shots ?? []).map(mapShot) };
+
+  const script = await commit({
+    clientId: media.clientId,
+    title: s.title || media.filename,
+    type: mapType(ex.brain?.tags?.videoType),
+    content,
+    isStarExample: true,
+  });
+
+  await prisma.mediaAsset.update({ where: { id: mediaId }, data: { status: 'CONFIRMED', scriptId: script.id } });
+  await prisma.mention.updateMany({ where: { mediaId }, data: { status: 'CONFIRMED' } });
+  await prisma.brainChange.create({
+    data: { clientId: media.clientId, kind: 'Сценарио', summary: `Потврдено увезено сценарио ${script.code}.` },
+  });
+  return { scriptId: script.id, code: script.code };
+}
+
+export async function rejectMedia(mediaId: string) {
+  const media = await prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+  if (!media) throw new AppError('NOT_FOUND', 'Медиумот не постои.');
+  await prisma.mediaAsset.update({ where: { id: mediaId }, data: { status: 'REJECTED' } });
+  await prisma.mention.updateMany({ where: { mediaId }, data: { status: 'REJECTED' } });
+  return { ok: true };
 }

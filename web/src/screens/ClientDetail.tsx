@@ -9,6 +9,7 @@ import { OnboardingPanel } from '../components/OnboardingPanel';
 import { AvatarCard } from '../components/AvatarCard';
 import { WhatsNewList } from '../components/WhatsNewList';
 import { BrainSection } from '../components/BrainSection';
+import { ClientIngest } from '../components/ClientIngest';
 import type { FieldDef } from '../components/BrainForm';
 
 const BRAIN_TABS: { key: string; label: string }[] = [
@@ -111,6 +112,7 @@ function Overview({ c }: { c: ClientDetailT }) {
         )}
       </section>
       </div>
+      <ClientIngest clientId={c.id} />
       <ClientSets clientId={c.id} clientCode={c.code} />
     </div>
   );

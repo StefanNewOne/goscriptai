@@ -10,7 +10,7 @@ import {
   advanceClient,
   suggestCodeForName,
 } from '../services/clientService.js';
-import { ingestExtraction, listPendingMedia } from '../services/ingestService.js';
+import { ingestExtraction, listPendingMedia, confirmMedia, rejectMedia } from '../services/ingestService.js';
 
 const ingestSchema = z.object({
   filename: z.string().min(1),
@@ -43,6 +43,16 @@ export async function clientRoutes(app: FastifyInstance) {
   app.get('/:id/ingest', async (req) => {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     return { data: await listPendingMedia(id) };
+  });
+
+  const mediaParam = z.object({ id: z.string(), mediaId: z.string() });
+  app.post('/:id/ingest/:mediaId/confirm', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req) => {
+    const { mediaId } = mediaParam.parse(req.params);
+    return { data: await confirmMedia(mediaId) };
+  });
+  app.post('/:id/ingest/:mediaId/reject', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req) => {
+    const { mediaId } = mediaParam.parse(req.params);
+    return { data: await rejectMedia(mediaId) };
   });
 
   app.get('/suggest-code', async (req) => {
