@@ -134,7 +134,6 @@ const products = (parsed.products ?? [])
   .filter((p) => p?.name)
   .map((p) => ({ name: p.name, category: p.category || undefined, price: p.price ? Number(p.price) : undefined, essence: p.essence || undefined }));
 console.log(`Најдени ${products.length} продукти.`);
-if (products.length === 0) process.exit(0);
 
 const token = (
   await (
@@ -149,12 +148,21 @@ if (!token) fail('Најавата не успеа — провери INGEST_EMA
 const clients = (await (await fetch(`${apiUrl}/clients`, { headers: { Authorization: `Bearer ${token}` } })).json())?.data ?? [];
 const client = clients.find((c) => c.code === clientCode);
 if (!client) fail(`Нема клиент со код „${clientCode}" во системот.`);
+const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
-const push = await (
-  await fetch(`${apiUrl}/clients/${client.id}/products/ingest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ products }),
-  })
-).json();
-console.log(`✅ Создадени ${push.data?.created ?? 0} продукт-предлози за ${clientCode} (чекаат потврда во Мозок → Продукти).`);
+if (products.length > 0) {
+  const push = await (
+    await fetch(`${apiUrl}/clients/${client.id}/products/ingest`, { method: 'POST', headers: auth, body: JSON.stringify({ products }) })
+  ).json();
+  console.log(`✅ Создадени ${push.data?.created ?? 0} продукт-предлози за ${clientCode} (чекаат потврда во Мозок → Продукти).`);
+}
+
+// Always store the full site text — raw material for the Client Analyst.
+try {
+  const wt = await (
+    await fetch(`${apiUrl}/clients/${client.id}/website-text`, { method: 'POST', headers: auth, body: JSON.stringify({ text }) })
+  ).json();
+  console.log(`✅ Зачуван текст од сајтот (${wt.data?.saved ?? 0} знаци) за анализа.`);
+} catch (e) {
+  console.log('⚠ Текстот не се зачува: ' + (e?.message ?? e));
+}

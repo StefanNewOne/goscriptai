@@ -16,6 +16,7 @@ import {
   confirmMedia,
   rejectMedia,
   ingestProducts,
+  saveWebsiteText,
 } from '../services/ingestService.js';
 
 const ingestSchema = z.object({
@@ -77,6 +78,13 @@ export async function clientRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     const body = productsIngestSchema.parse(req.body);
     return reply.status(201).send({ data: await ingestProducts(id, body.products) });
+  });
+
+  // Full scraped site text → stored on the client for the Client Analyst.
+  app.post('/:id/website-text', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const body = z.object({ text: z.string() }).parse(req.body);
+    return reply.status(201).send({ data: await saveWebsiteText(id, body.text) });
   });
 
   app.get('/suggest-code', async (req) => {

@@ -115,6 +115,7 @@ model Client {
   status           ClientStatus  @default(DRAFT)
   logoUrl          String?
   websiteUrl       String?
+  websiteText      String? // full scraped site text — raw material for the Client Analyst
   reelsPerMonth    Int?
   graphicsPerMonth Int?
   metaAdAccountIds String[]      @default([])

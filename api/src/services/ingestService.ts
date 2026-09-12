@@ -172,3 +172,15 @@ export async function ingestProducts(
   }
   return { created };
 }
+
+// Store the full scraped site text on the client — raw material the Client
+// Analyst reads to build a richer profile (tone, USP, audience, testimonials).
+export async function saveWebsiteText(clientId: string, websiteText: string) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new AppError('NOT_FOUND', 'Клиентот не постои.');
+  await prisma.client.update({ where: { id: clientId }, data: { websiteText } });
+  await prisma.brainChange.create({
+    data: { clientId, kind: 'Профил', summary: `Зачуван текст од веб-сајтот (${websiteText.length} знаци) за анализа.` },
+  });
+  return { saved: websiteText.length };
+}
