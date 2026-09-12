@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GoScriptAI — video → script extraction",
+  "description": "Faithful reconstruction of one marketing reel VIDEO into a script (verbatim lines + observed shots) plus PROPOSED brain metadata (tags, product mentions, actor hint, buyer avatar) that a human confirms. Script = truth from the video; brain = proposals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["script", "brain", "extraction"],
+  "properties": {
+    "script": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "format", "language", "durationSec", "hook", "shots", "cta"],
+      "properties": {
+        "title": { "type": "string", "description": "Краток наслов на сценариото." },
+        "format": {
+          "type": "string",
+          "description": "Формат на видеото.",
+          "enum": ["Presenter", "Скеч", "Тестимонијал", "Voiceover", "Demo", "Друго"]
+        },
+        "language": { "type": "string", "enum": ["MK", "SQ"] },
+        "durationSec": { "type": "number", "description": "Проценето времетраење во секунди." },
+        "platforms": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Само ако е видливо/кажано (ФБ/ИГ/ТТ); инаку празно."
+        },
+        "vibe": { "type": "string", "description": "Тон/расположение (пр. искрено, директно, самоуверено)." },
+        "music": { "type": "string", "description": "Впечаток за музика ако постои; инаку празно." },
+        "hook": { "type": "string", "description": "Отворачката реплика (хоок) — ДОСЛОВНО како е кажана." },
+        "shots": {
+          "type": "array",
+          "description": "Кадри по редослед, како што се менуваат на екран.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "role", "description", "onScreenText", "actor", "line"],
+            "properties": {
+              "index": { "type": "integer" },
+              "role": { "type": "string", "enum": ["ХООК", "БОДИ", "ЦТА"] },
+              "description": { "type": "string", "description": "Што се гледа/прави — НАБЉУДУВАНО од видеото, не измислено." },
+              "onScreenText": { "type": "string", "description": "Текст на екран во кадарот; празно ако нема." },
+              "actor": { "type": "string", "description": "Ознака на лицето што зборува (пр. 'Презентер'); име ако е кажано." },
+              "line": { "type": "string", "description": "Изговорената реплика — ДОСЛОВНО, збор до збор, без парафраза или скратување. Празно ако кадарот нема реплика." }
+            }
+          }
+        },
+        "cta": { "type": "string", "description": "Завршниот повик на дејство — дословно ако е изговорен." }
+      }
+    },
+    "brain": {
+      "type": "object",
+      "description": "ПРЕДЛОЗИ за Мозокот — човек ги потврдува. Не се вистина.",
+      "additionalProperties": false,
+      "required": ["tags", "productMentions", "actorHint", "buyerAvatar"],
+      "properties": {
+        "tags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["videoType", "topic", "hookType", "ctaGoal", "extra"],
+          "properties": {
+            "videoType": { "type": "string", "description": "ТИП НА ВИДЕО (пр. најава, подобрување, продажно, едукација, тестимонијал, скеч)." },
+            "topic": { "type": "array", "items": { "type": "string" }, "description": "ШТО СЕ ЗБОРУВА — една или повеќе теми." },
+            "hookType": { "type": "string", "description": "КАКОВ ХООК (пр. признание+ветување, обвинение→обрт, директна корист/how-to, прашање, шок, статистика, сцена)." },
+            "ctaGoal": { "type": "string", "description": "Цел (пр. посета, пораки, продажба, резервација, следење, едукација)." },
+            "extra": { "type": "array", "items": { "type": "string" }, "description": "Дополнителни тагови што Gemini ги предлага за овој клиент." }
+          }
+        },
+        "productMentions": {
+          "type": "array",
+          "description": "Продукти/услуги СПОМНАТИ во видеото — СУШТИНА, не цена/спецификации.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "essence", "quote"],
+            "properties": {
+              "name": { "type": "string", "description": "Име на продукт/услуга." },
+              "essence": { "type": "string", "description": "Што е и зошто е важно (суштина), НЕ цена." },
+              "quote": { "type": "string", "description": "Краток дословен цитат од видеото што го спомнува." }
+            }
+          }
+        },
+        "actorHint": {
+          "type": "object",
+          "description": "Кратка насока за лицето на екран (за мапирање + еднократно збогатување на записот Актер).",
+          "additionalProperties": false,
+          "required": ["gender", "ageRange", "look"],
+          "properties": {
+            "gender": { "type": "string", "description": "машки/женски/друго." },
+            "ageRange": { "type": "string", "description": "Приближна возраст (пр. 18-25, 25-35)." },
+            "look": { "type": "string", "description": "Краток опис на изглед/енергија (пр. модерна, лежерна, професионална)." }
+          }
+        },
+        "buyerAvatar": {
+          "type": "object",
+          "description": "Кому е наменето видеото — предлог за аватар на купувач.",
+          "additionalProperties": false,
+          "required": ["persona"],
+          "properties": {
+            "persona": { "type": "string", "description": "Демографија + црта (пр. 'гостин што сака брзина и без чекање')." }
+          }
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["linesVerbatim", "assumptions"],
+      "properties": {
+        "linesVerbatim": { "type": "boolean", "description": "true ако репликите се преземени збор до збор (не претпоставени)." },
+        "assumptions": { "type": "string", "description": "Било какви претпоставки/нејаснотии (пр. кадар што е нејасен). Празно ако нема." }
+      }
+    }
+  }
+}
