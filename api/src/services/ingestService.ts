@@ -1,8 +1,18 @@
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { commit } from './importService.js';
-import { isFrameRole, type Frame, type ScriptContent } from '../domain/scriptFormat.js';
+import { type Frame, type ScriptContent } from '../domain/scriptFormat.js';
 import type { ScriptType } from '../domain/types.js';
+
+// Normalize shot roles — some models return Latin (HOOK/BODY/CTA).
+const ROLE_MAP: Record<string, Frame['role']> = {
+  ХООК: 'ХООК',
+  БОДИ: 'БОДИ',
+  ЦТА: 'ЦТА',
+  HOOK: 'ХООК',
+  BODY: 'БОДИ',
+  CTA: 'ЦТА',
+};
 
 // Receives a Gemini video→script extraction and stores it as PENDING brain
 // proposals — a MediaAsset (the full extraction), Mentions (what was said about
@@ -86,7 +96,7 @@ interface ShotIn {
 
 function mapShot(sh: ShotIn): Frame {
   return {
-    role: isFrameRole(sh?.role ?? '') ? (sh.role as Frame['role']) : 'БОДИ',
+    role: ROLE_MAP[(sh?.role ?? '').toUpperCase().trim()] ?? 'БОДИ',
     direction: sh?.description ?? '',
     lines: sh?.line ? [{ actor: sh.actor || 'Актер', text: sh.line }] : [],
     ...(sh?.onScreenText ? { subLabel: `Текст на екран: ${sh.onScreenText}` } : {}),
