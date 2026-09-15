@@ -60,8 +60,8 @@ export function NewSet() {
         </Card>
 
         <Card>
-          <Label>Забелешки / што кажа клиентот</Label>
-          <textarea className="w-full rounded-control border border-rule bg-sheet p-2 text-14" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Label>Бриф: идеја и насока за овој сет (најважно)</Label>
+          <textarea className="w-full rounded-control border border-rule bg-sheet p-2 text-14" rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Што сакаш од овој сет реелови? Аголот, пораката, поводот, тонот — ова води сѐ." />
         </Card>
 
         <div className="flex items-center gap-4">

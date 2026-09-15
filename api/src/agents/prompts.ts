@@ -46,6 +46,9 @@ export function scriptSkeleton(content: unknown): string {
 
 // ── Creative Director ────────────────────────────────────────────────────
 export interface CreativeDirectorInput {
+  // The scriptwriter's free-text brief — the idea/direction for THIS set. Top
+  // priority: every concept must serve it (F1).
+  brief?: string;
   clientName: string;
   language: string;
   requested: number;
@@ -70,13 +73,20 @@ export function buildCreativeDirectorPrompt(i: CreativeDirectorInput): string {
     ? `\n\nИНСАЈТИ (што пали — искористи ги):\n${i.insights.map((n) => `• ${n.text}`).join('\n')}`
     : '';
   const dncBlock = i.doNotCopy.length ? `\n\nНЕ ПРАВИ ВАКА (DO_NOT_COPY):\n${i.doNotCopy.map((s) => `• ${s}`).join('\n')}` : '';
-  // F1 will inject the scriptwriter BRIEF here, at the very top (highest priority).
-  const ctx = `Клиент: ${i.clientName} (јазик ${i.language}). Барани сценарија: ${i.requested} (генерирај ${i.requested * 2} концепти).\nПродукт во фокус: ${i.product ?? '—'}\nАватари (користи го ТОЧНИОТ id):\n${i.avatars.map((a) => `- ${a.id} · ${a.name}${avatarBrief(a) ? ` — ${avatarBrief(a)}` : ''}`).join('\n')}\nАктери (id·име·јазици): ${i.actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${i.locations.map((l) => `${l.id}·${l.name}`).join(', ')}\nРечник (имиња на продукти точно; други термини природно, без набивање): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${hooksBlock}${insightBlock}${dncBlock}`;
+  // The scriptwriter's brief leads — every concept must serve it (F1).
+  const briefBlock = i.brief?.trim()
+    ? `БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА за овој сет. Секој концепт мора да произлезе од овој бриф и да му служи:\n${i.brief.trim()}\n\n`
+    : '';
+  const ctx = `${briefBlock}Клиент: ${i.clientName} (јазик ${i.language}). Барани сценарија: ${i.requested} (генерирај ${i.requested * 2} концепти).\nПродукт во фокус: ${i.product ?? '—'}\nАватари (користи го ТОЧНИОТ id):\n${i.avatars.map((a) => `- ${a.id} · ${a.name}${avatarBrief(a) ? ` — ${avatarBrief(a)}` : ''}`).join('\n')}\nАктери (id·име·јазици): ${i.actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${i.locations.map((l) => `${l.id}·${l.name}`).join(', ')}\nРечник (имиња на продукти точно; други термини природно, без набивање): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${hooksBlock}${insightBlock}${dncBlock}`;
   return `${ctx}\nСЕКОЈ концепт со РАЗЛИЧЕН агол и свеж хук — не повторувај ги истите потписни фрази од сет до сет.\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`;
 }
 
 // ── Writer ───────────────────────────────────────────────────────────────
 export interface WriterInput {
+  // The scriptwriter's free-text brief for THIS set — top priority; the script
+  // must fulfil it before anything else (F1). Only used for a fresh script; a
+  // revision resumes the same session, which already carries the brief.
+  brief?: string;
   language: string;
   revision?: boolean;
   comment?: string;
@@ -104,10 +114,13 @@ export function buildWriterPrompt(i: WriterInput): string {
   const exampleBlock = i.skeletons.length
     ? `\nТИПИЧНИ ФОРМИ НА КЛИЕНТОТ (само ритам/должини на бит-ови — БЕЗ текст; варирај во рамки, не следи ропски):\n${i.skeletons.map((sk, n) => `Форма ${n + 1}:\n${sk}`).join('\n\n')}`
     : '';
-  // F1 will inject the scriptwriter BRIEF here, at the very top (highest priority).
+  // The scriptwriter's brief leads the fresh script — it must fulfil it first (F1).
+  const briefBlock = i.brief?.trim()
+    ? `БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА за овој сет. Сценариото мора да го исполни ова пред сѐ друго:\n${i.brief.trim()}\n\n`
+    : '';
   return i.revision
     ? `Ревидирај го сценариото според коментарот: „${i.comment ?? ''}“. Задржи го форматот §11.`
-    : `Напиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.\nКонцепт (hook): „${i.hook}“${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
+    : `${briefBlock}Напиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.\nКонцепт (hook): „${i.hook}“${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
 }
 
 // ── Critic ───────────────────────────────────────────────────────────────

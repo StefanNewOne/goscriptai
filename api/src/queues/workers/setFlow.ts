@@ -81,7 +81,7 @@ async function loadInspiration(clientId: string) {
 
 async function creativeDirector(setId: string) {
   const set = await prisma.scriptSet.findUniqueOrThrow({ where: { id: setId }, include: { client: true } });
-  const brief = set.brief as { product?: string; avatarIds?: string[]; actorIds?: string[]; locationIds?: string[] };
+  const brief = set.brief as { product?: string; notes?: string; avatarIds?: string[]; actorIds?: string[]; locationIds?: string[] };
   const avatars = await prisma.avatar.findMany({ where: { clientId: set.clientId, status: 'ACTIVE' } });
   const actors = await prisma.actor.findMany({ where: { OR: [{ clientId: set.clientId }, { clientId: null }] } });
   const locations = await prisma.location.findMany({ where: { clientId: set.clientId } });
@@ -103,6 +103,7 @@ async function creativeDirector(setId: string) {
       const insp = await loadInspiration(set.clientId);
       const doNotCopy = insp.doNotCopy.map((r) => r.analysis || r.url).filter((s): s is string => !!s);
       const prompt = buildCreativeDirectorPrompt({
+        brief: brief.notes,
         clientName: set.client.name,
         language: set.client.language,
         requested: set.requested,
@@ -150,7 +151,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
   const system = await getSystemPrompt('writer');
   const run = await startRun({ clientId: set.clientId, setId: set.id, conceptId: concept.id, agentKind: 'writer', model: routing.model, scope: 'set', scopeId: set.id });
   try {
-    const brief = set.brief as { product?: string };
+    const brief = set.brief as { product?: string; notes?: string };
     let drafted: {
       title: string;
       content: ScriptContent;
@@ -177,6 +178,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
       // run on the set, or parallel writers would resume each other's context.
       const priorRun = job.revision ? await prisma.agentRun.findFirst({ where: { setId: set.id, conceptId: concept.id, agentKind: 'writer', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } }) : null;
       const prompt = buildWriterPrompt({
+        brief: brief.notes,
         language: client.language,
         revision: job.revision,
         comment: job.comment,

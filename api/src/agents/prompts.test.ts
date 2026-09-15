@@ -74,6 +74,18 @@ describe('buildCreativeDirectorPrompt', () => {
     expect(p.endsWith('Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.')).toBe(true);
   });
 
+  it('puts the scriptwriter brief FIRST, above the client line (F1)', () => {
+    const p = buildCreativeDirectorPrompt({ ...cdBase, brief: 'сезонска акција, потоплен тон' });
+    expect(p.startsWith('БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА')).toBe(true);
+    expect(p).toContain('сезонска акција, потоплен тон');
+    expect(p.indexOf('БРИФ ОД СЦЕНАРИСТОТ')).toBeLessThan(p.indexOf('Клиент: Алекс'));
+  });
+
+  it('omits the brief block when brief is empty/whitespace', () => {
+    expect(buildCreativeDirectorPrompt({ ...cdBase, brief: '   ' })).not.toContain('БРИФ ОД СЦЕНАРИСТОТ');
+    expect(buildCreativeDirectorPrompt(cdBase)).not.toContain('БРИФ ОД СЦЕНАРИСТОТ');
+  });
+
   it('omits optional blocks and shows — when product/voice/hooks are empty', () => {
     const p = buildCreativeDirectorPrompt({ ...cdBase, product: undefined, voiceCard: '', hooks: [], insights: [], doNotCopy: [] });
     expect(p).toContain('Продукт во фокус: —');
@@ -98,9 +110,17 @@ describe('buildWriterPrompt', () => {
     expect(p.endsWith('Врати го во бараниот JSON облик.')).toBe(true);
   });
 
-  it('revision: short prompt referencing only the comment', () => {
-    const p = buildWriterPrompt({ ...writerBase, revision: true, comment: 'скрати го хукот' });
+  it('puts the scriptwriter brief FIRST on a fresh script (F1)', () => {
+    const p = buildWriterPrompt({ ...writerBase, brief: 'сезонска акција, потоплен тон' });
+    expect(p.startsWith('БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА')).toBe(true);
+    expect(p).toContain('сезонска акција, потоплен тон');
+    expect(p.indexOf('БРИФ ОД СЦЕНАРИСТОТ')).toBeLessThan(p.indexOf('Напиши цело реел-сценарио'));
+  });
+
+  it('revision: short prompt referencing only the comment (no brief re-injected — session carries it)', () => {
+    const p = buildWriterPrompt({ ...writerBase, brief: 'сезонска акција', revision: true, comment: 'скрати го хукот' });
     expect(p).toBe('Ревидирај го сценариото според коментарот: „скрати го хукот“. Задржи го форматот §11.');
+    expect(p).not.toContain('БРИФ ОД СЦЕНАРИСТОТ');
   });
 
   it('omits avatar/catalog/tone/skeleton blocks when absent', () => {
