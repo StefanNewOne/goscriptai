@@ -140,11 +140,33 @@ model Client {
   mediaAssets MediaAsset[]
   mentions    Mention[]
   tags        Tag[]
+  intakeJobs  IntakeJob[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+// UI-triggered, LOCALLY-executed intake. The scriptwriter sets sources (web URL
+// + local folder paths) and clicks "Полни мозок"; a local companion worker on
+// the operator's machine claims the job, runs scrape/Gemini/docs LOCALLY, and
+// uploads only the results. Raw files never leave the machine.
+model IntakeJob {
+  id           String   @id @default(cuid())
+  clientId     String
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  webUrl       String?
+  videosPath   String?
+  graphicsPath String?
+  docsPath     String?
+  status       String   @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  progress     String?
+  error        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model ClientProfile {
@@ -189,6 +211,7 @@ model Actor {
   cannotDo  String[]   @default([])
   notes     String?
   photoUrl  String?
+  confirmed Boolean    @default(true) // false = mined from scripts, awaiting scriptwriter confirmation
   concepts  Concept[]
 
   @@index([clientId])
@@ -203,6 +226,7 @@ model Location {
   usableElements String[] @default([])
   constraints    String?
   images         String[] @default([])
+  confirmed      Boolean   @default(true) // false = auto-extracted from video, awaiting confirmation
   concepts       Concept[]
 
   @@index([clientId])
@@ -261,10 +285,11 @@ model GlossaryTerm {
   id       String   @id @default(cuid())
   clientId String
   client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  language Language
-  term     String
-  meaning  String
-  kind     String // PREFERRED | BANNED | PRODUCT_NAME
+  language  Language
+  term      String
+  meaning   String
+  kind      String  // PREFERRED | BANNED | PRODUCT_NAME
+  confirmed Boolean @default(true) // false = mined from scripts, awaiting scriptwriter confirmation
 
   @@index([clientId, language])
 }
@@ -368,6 +393,16 @@ model Script {
   revisionRound Int                           @default(0)
   isStarExample Boolean                       @default(false)
   source        String                        @default("GENERATED") // GENERATED | IMPORTED
+  // Rich delivered-document fields (scenario-templejt): the parts a video can't
+  // capture — unshot hook/caption variants, production note, and shoot metadata.
+  format         String?                      // e.g. "Presenter — Тамара + demo кадри"
+  vibe           String?
+  music          String?
+  platforms      String[]                     @default([])
+  durationSec    Int?
+  hookVariants   String[]                     @default([])
+  captions       String[]                     @default([])
+  productionNote String?
   embedding     Unsupported("vector(1536)")?
   adCreatives   AdCreative[]
   versions      ScriptVersion[]
@@ -429,6 +464,7 @@ model AgentRun {
   id        String    @id @default(cuid())
   setId     String?
   set       ScriptSet? @relation(fields: [setId], references: [id])
+  conceptId String? // which concept this run wrote — lets a revision resume the RIGHT session
   clientId  String
   client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   agentKind String
