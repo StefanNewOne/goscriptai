@@ -9,6 +9,33 @@ interface ParseResult {
   warnings: { code: string; message: string; frame?: number }[];
 }
 
+type RichDelta = { hookVariants: boolean; captions: boolean; productionNote: boolean };
+interface SimilarMatch {
+  id: string;
+  code: string;
+  title: string;
+  similarity: number;
+  source: string;
+  targetAdds: RichDelta; // fields the imported doc has that this match lacks
+  matchAdds: RichDelta; // fields this match has that the imported doc lacks
+}
+interface DocImportResult {
+  scriptId: string;
+  code: string;
+  hooks: number;
+  captions: number;
+  frames: number;
+  similar: SimilarMatch[];
+}
+
+const DELTA_LABELS: Record<keyof RichDelta, string> = {
+  hookVariants: 'хук-варијанти',
+  captions: 'caption',
+  productionNote: 'продукциска забелешка',
+};
+const deltaList = (d: RichDelta) =>
+  (Object.keys(DELTA_LABELS) as (keyof RichDelta)[]).filter((k) => d[k]).map((k) => DELTA_LABELS[k]).join(', ');
+
 const SAMPLE = `КАДАР 1 — ХООК
 Ајтов држи ваучер и гледа во камера.
 Ајтов: „500 денари попуст, само овој викенд.“
@@ -39,14 +66,15 @@ export function Import() {
       form.append('clientId', docClient);
       form.append('isStarExample', 'true');
       form.append('file', docFile!);
-      return api.upload<{
-        code: string;
-        hooks: number;
-        captions: number;
-        frames: number;
-        similar: { code: string; similarity: number; source: string }[];
-      }>('/import/document', form);
+      return api.upload<DocImportResult>('/import/document', form);
     },
+  });
+
+  // Carry rich fields between an imported doc and its video-derived twin. Fills
+  // only the target's gaps (never overwrites); backend logs the change.
+  const enrich = useMutation({
+    mutationFn: (v: { targetId: string; sourceId: string }) =>
+      api.post<{ updated: boolean; fields: string[] }>(`/scripts/${v.targetId}/enrich`, { sourceId: v.sourceId }),
   });
 
   const parse = useMutation({ mutationFn: () => api.post<ParseResult>('/import/parse', { text }), onSuccess: setParsed });
@@ -110,16 +138,45 @@ export function Import() {
                 Внесено {docImport.data.code} · {docImport.data.frames} кадри · {docImport.data.hooks} хук-варијанти · {docImport.data.captions} caption.
               </p>
               {docImport.data.similar.length > 0 && (
-                <p className="mt-1 text-13 text-ink-2">
-                  Слично на:{' '}
-                  {docImport.data.similar.map((s, i) => (
-                    <span key={s.code}>
-                      {i > 0 && ', '}
-                      <span className="font-mono">{s.code}</span> ({s.similarity}%{s.source === 'GENERATED' ? ', од видео' : ''})
-                    </span>
-                  ))}
-                  {' '}— спореди во Базата на сценарија.
-                </p>
+                <div className="mt-2 rounded-control border border-rule bg-paper p-3">
+                  <p className="mb-2 text-13 text-ink-2">Слично на постоечки сценарија — пренеси го она што недостасува (не се презапишува ништо):</p>
+                  {docImport.data.similar.map((s) => {
+                    const give = deltaList(s.targetAdds); // this doc → the match (usually a video twin)
+                    const take = deltaList(s.matchAdds); // the match → this doc
+                    const scriptId = docImport.data!.scriptId;
+                    return (
+                      <div key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rule py-2 text-13 first:border-t-0">
+                        <span className="font-mono">{s.code}</span>
+                        <span className="text-ink-2">{s.similarity}%{s.source === 'GENERATED' ? ' · од видео' : ''}</span>
+                        {give && (
+                          <button
+                            className="rounded-control border border-rule px-2 py-1 text-13 hover:bg-nav-hover disabled:opacity-50"
+                            onClick={() => enrich.mutate({ targetId: s.id, sourceId: scriptId })}
+                            disabled={enrich.isPending}
+                          >
+                            Пренеси во {s.code}: {give}
+                          </button>
+                        )}
+                        {take && (
+                          <button
+                            className="rounded-control border border-rule px-2 py-1 text-13 hover:bg-nav-hover disabled:opacity-50"
+                            onClick={() => enrich.mutate({ targetId: scriptId, sourceId: s.id })}
+                            disabled={enrich.isPending}
+                          >
+                            Земи од {s.code}: {take}
+                          </button>
+                        )}
+                        {!give && !take && <span className="text-ink-2">— нема разлика во богати полиња</span>}
+                      </div>
+                    );
+                  })}
+                  {enrich.data && (
+                    <p className="mt-2 text-13 text-ok">
+                      {enrich.data.updated ? `Пренесено: ${enrich.data.fields.join(', ')}.` : 'Немаше што да се пренесе.'}
+                    </p>
+                  )}
+                  {enrich.isError && <p className="mt-2 text-13 text-fail">{(enrich.error as Error).message}</p>}
+                </div>
               )}
             </div>
           )}
