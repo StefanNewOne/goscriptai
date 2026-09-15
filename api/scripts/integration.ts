@@ -2,6 +2,7 @@
 // Comprehensive integration + security test. Boots the server in-process against
 // the real dev DB + Redis, exercises auth/RBAC/validation/business-rules/security
 // and the full agentic flows, then cleans up. Run: npm run test:integration
+import './force-stub.js'; // MUST be first — blanks agent env so the test runs in stub mode
 import bcrypt from 'bcryptjs';
 import { buildServer } from '../src/server.js';
 import { prisma } from '../src/lib/prisma.js';
@@ -220,6 +221,8 @@ async function run() {
     failures.forEach((f) => console.log('  - ' + f));
     process.exit(1);
   }
+  // Redis/BullMQ connections keep the event loop alive; exit cleanly on success.
+  process.exit(0);
 }
 
 run().catch((e) => {

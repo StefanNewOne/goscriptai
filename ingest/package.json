@@ -8,6 +8,9 @@
     "video": "node --env-file=.env video-to-script.mjs",
     "push": "node --env-file=.env push-existing.mjs",
     "scrape": "node --env-file=.env scrape-web.mjs",
+    "graphics": "node --env-file=.env graphic-to-brain.mjs",
+    "intake": "node --env-file=.env intake.mjs",
+    "worker": "node --env-file=.env worker.mjs",
     "models": "node --env-file=.env list-models.mjs"
   },
   "dependencies": {

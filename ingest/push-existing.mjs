@@ -12,6 +12,7 @@ function fail(m) {
 const args = process.argv.slice(2);
 const folder = args.find((a) => !a.startsWith('--'));
 const clientCode = args.find((a) => a.startsWith('--client='))?.split('=')[1] ?? null;
+const autoConfirm = args.includes('--confirm'); // confirm each pushed script immediately
 if (!folder) fail('Патека до фолдер (со подфолдер сценариа) недостасува.');
 if (!clientCode) fail('--client=КОД недостасува (пр. --client=GODIGITAL).');
 
@@ -42,6 +43,8 @@ console.log(`Праќам ${files.length} сценарија → клиент ${
 
 let ok = 0;
 let bad = 0;
+let skipped = 0;
+let confirmed = 0;
 for (const f of files) {
   try {
     const extraction = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
@@ -50,16 +53,34 @@ for (const f of files) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ filename: f.replace(/\.json$/, ''), extraction }),
     });
-    if (r.ok) {
-      ok++;
-      console.log(`✅ ${f}`);
-    } else {
+    if (!r.ok) {
       bad++;
       console.log(`❌ ${f} (${r.status})`);
+      continue;
+    }
+    const data = (await r.json())?.data ?? {};
+    if (data.duplicate) {
+      skipped++;
+      console.log(`⏭  ${f} — веќе внесено`);
+      continue;
+    }
+    ok++;
+    console.log(`✅ ${f}`);
+    if (autoConfirm && data.mediaAssetId) {
+      const cr = await fetch(`${apiUrl}/clients/${client.id}/ingest/${data.mediaAssetId}/confirm`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (cr.ok) {
+        confirmed++;
+        console.log(`   ↳ потврдено`);
+      } else {
+        console.log(`   ⚠ потврда не успеа (${cr.status})`);
+      }
     }
   } catch (e) {
     bad++;
     console.log(`❌ ${f}: ${e?.message ?? e}`);
   }
 }
-console.log(`\nГотово: ${ok} пратени · ${bad} паднати`);
+console.log(`\nГотово: ${ok} пратени${autoConfirm ? ` · ${confirmed} потврдени` : ''} · ${skipped} прескокнати (веќе внесени) · ${bad} паднати`);
