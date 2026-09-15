@@ -141,7 +141,7 @@ async function creativeDirector(setId: string) {
 }
 
 async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
-  const concept = await prisma.concept.findUniqueOrThrow({ where: { id: job.conceptId }, include: { actor: true, set: { include: { client: true } } } });
+  const concept = await prisma.concept.findUniqueOrThrow({ where: { id: job.conceptId }, include: { actor: true, location: true, set: { include: { client: true } } } });
   const set = concept.set;
   const client = set.client;
   const actorName = concept.actor?.name ?? 'Актер';
@@ -192,6 +192,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
         actorName,
         actorStyle: actor?.style ?? null,
         actorCannotDo: actor?.cannotDo,
+        location: concept.location,
         preferred,
         banned,
         voiceCard: voice.voiceCard,

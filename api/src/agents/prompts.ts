@@ -136,6 +136,9 @@ export interface WriterInput {
   actorName: string;
   actorStyle?: string | null;
   actorCannotDo?: string[];
+  // The concept's filming location — its usable elements and constraints shape
+  // what the script can direct on set (F5).
+  location?: { name: string; description?: string | null; usableElements?: string[]; constraints?: string | null } | null;
   preferred: string[];
   banned: string[];
   voiceCard: string;
@@ -158,13 +161,16 @@ export function buildWriterPrompt(i: WriterInput): string {
   const typeBlock = typeGuide ? `\nТип на сценарио: ${typeGuide}` : '';
   const insightBlock = i.insight?.trim() ? `\nИнсајт (зошто гледачот застанува): ${i.insight.trim()}` : '';
   const whyBlock = i.why?.trim() ? `\nЗошто овој концепт работи: ${i.why.trim()}` : '';
+  const locationBlock = i.location
+    ? `\nЛокација: ${i.location.name}${i.location.description ? ` — ${i.location.description}` : ''}${i.location.usableElements?.length ? `\nИскористи од локацијата: ${i.location.usableElements.join(', ')}` : ''}${i.location.constraints ? `\nОграничувања на локацијата: ${i.location.constraints}` : ''}`
+    : '';
   // The scriptwriter's brief leads the fresh script — it must fulfil it first (F1).
   const briefBlock = i.brief?.trim()
     ? `БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА за овој сет. Сценариото мора да го исполни ова пред сѐ друго:\n${i.brief.trim()}\n\n`
     : '';
   return i.revision
     ? `Ревидирај го сценариото според коментарот: „${i.comment ?? ''}“. Задржи го форматот §11.`
-    : `${briefBlock}${marketFraming(i.language)}\n\nНапиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.${typeBlock}\nКонцепт (hook): „${i.hook}“${insightBlock}${whyBlock}${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
+    : `${briefBlock}${marketFraming(i.language)}\n\nНапиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.${typeBlock}\nКонцепт (hook): „${i.hook}“${insightBlock}${whyBlock}${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}${locationBlock}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
 }
 
 // ── Critic ───────────────────────────────────────────────────────────────

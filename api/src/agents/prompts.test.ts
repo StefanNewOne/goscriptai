@@ -166,6 +166,20 @@ describe('buildWriterPrompt', () => {
     expect(p).not.toContain('Зошто овој концепт работи');
   });
 
+  it('includes the location with usable elements and constraints (F5)', () => {
+    const p = buildWriterPrompt({
+      ...writerBase,
+      location: { name: 'Салон', description: 'светло студио', usableElements: ['огледало', 'столче'], constraints: 'без гласна музика' },
+    });
+    expect(p).toContain('Локација: Салон — светло студио');
+    expect(p).toContain('Искористи од локацијата: огледало, столче');
+    expect(p).toContain('Ограничувања на локацијата: без гласна музика');
+  });
+
+  it('omits the location block when absent (F5)', () => {
+    expect(buildWriterPrompt({ ...writerBase, location: null })).not.toContain('Локација:');
+  });
+
   it('revision: short prompt referencing only the comment (no brief re-injected — session carries it)', () => {
     const p = buildWriterPrompt({ ...writerBase, brief: 'сезонска акција', revision: true, comment: 'скрати го хукот' });
     expect(p).toBe('Ревидирај го сценариото според коментарот: „скрати го хукот“. Задржи го форматот §11.');
