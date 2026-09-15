@@ -8,6 +8,7 @@ import {
   competitorSchema,
   referenceSchema,
   glossarySchema,
+  insightSchema,
 } from '../schemas/brain.js';
 
 async function ensureClient(clientId: string) {
@@ -110,6 +111,24 @@ export async function deleteGlossary(id: string) {
   await prisma.glossaryTerm.delete({ where: { id } });
 }
 
+// ── Insights (manual, Ф1) ───────────────────────────────────────────
+export async function createInsight(clientId: string, body: unknown) {
+  await ensureClient(clientId);
+  const d = insightSchema.parse(body);
+  const i = await prisma.insight.create({
+    data: { clientId, text: d.text, weight: d.weight, industry: d.industry ?? null, evidence: {} },
+  });
+  await logChange(clientId, 'Инсајт', 'Додаден рачен инсајт.');
+  return i;
+}
+export async function updateInsight(id: string, body: unknown) {
+  const d = insightSchema.partial().parse(body);
+  return prisma.insight.update({ where: { id }, data: { text: d.text, weight: d.weight, industry: d.industry } });
+}
+export async function deleteInsight(id: string) {
+  await prisma.insight.delete({ where: { id } });
+}
+
 // Confirm an agent-proposed competitor/avatar (PENDING_CONFIRMATION → active).
 export async function confirmCompetitor(id: string) {
   return prisma.competitor.update({ where: { id }, data: { status: 'CONFIRMED' } });
@@ -119,6 +138,15 @@ export async function confirmAvatar(id: string) {
 }
 export async function confirmProduct(id: string) {
   return prisma.product.update({ where: { id }, data: { confirmed: true } });
+}
+export async function confirmActor(id: string) {
+  return prisma.actor.update({ where: { id }, data: { confirmed: true } });
+}
+export async function confirmLocation(id: string) {
+  return prisma.location.update({ where: { id }, data: { confirmed: true } });
+}
+export async function confirmGlossary(id: string) {
+  return prisma.glossaryTerm.update({ where: { id }, data: { confirmed: true } });
 }
 
 export const _idParam = z.object({ id: z.string() });

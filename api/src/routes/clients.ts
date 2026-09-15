@@ -16,8 +16,10 @@ import {
   confirmMedia,
   rejectMedia,
   ingestProducts,
+  ingestGraphics,
   saveWebsiteText,
 } from '../services/ingestService.js';
+import { mineFromScripts, listHooks } from '../services/mineService.js';
 
 const ingestSchema = z.object({
   filename: z.string().min(1),
@@ -80,11 +82,45 @@ export async function clientRoutes(app: FastifyInstance) {
     return reply.status(201).send({ data: await ingestProducts(id, body.products) });
   });
 
+  // Graphics reading → product + slogan proposals (confirmed=false).
+  app.post('/:id/graphics', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const body = z
+      .object({
+        products: z
+          .array(
+            z.object({
+              name: z.string().min(1),
+              category: z.string().optional(),
+              price: z.number().optional(),
+              essence: z.string().optional(),
+            }),
+          )
+          .optional(),
+        slogans: z.array(z.string()).optional(),
+        brandNotes: z.string().optional(),
+      })
+      .parse(req.body);
+    return reply.status(201).send({ data: await ingestGraphics(id, body) });
+  });
+
   // Full scraped site text → stored on the client for the Client Analyst.
   app.post('/:id/website-text', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req, reply) => {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     const body = z.object({ text: z.string() }).parse(req.body);
     return reply.status(201).send({ data: await saveWebsiteText(id, body.text) });
+  });
+
+  // Mine confirmed star scripts → Actor + Glossary proposals (confirmed=false).
+  app.post('/:id/mine', { preHandler: [app.requireRole('SCRIPTWRITER', 'ADMIN')] }, async (req) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    return { data: await mineFromScripts(id) };
+  });
+
+  // Proven hooks from the client's confirmed star scripts (creativity swipe file).
+  app.get('/:id/hooks', async (req) => {
+    const { id } = z.object({ id: z.string() }).parse(req.params);
+    return { data: await listHooks(id) };
   });
 
   app.get('/suggest-code', async (req) => {

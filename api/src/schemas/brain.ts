@@ -57,5 +57,13 @@ export const glossarySchema = z.object({
   kind: z.enum(['PREFERRED', 'BANNED', 'PRODUCT_NAME']),
 });
 
-export const BRAIN_ENTITIES = ['products', 'actors', 'locations', 'competitors', 'references', 'glossary'] as const;
+// Manual insights (Ф1) — the scriptwriter's own learnings. Auto insights from
+// Meta ad results stay Ф2. Both feed the Creative Director.
+export const insightSchema = z.object({
+  text: z.string().min(1),
+  weight: z.coerce.number().int().min(1).max(5).default(1),
+  industry: z.string().optional(),
+});
+
+export const BRAIN_ENTITIES = ['products', 'actors', 'locations', 'competitors', 'references', 'glossary', 'insights'] as const;
 export type BrainEntity = (typeof BRAIN_ENTITIES)[number];

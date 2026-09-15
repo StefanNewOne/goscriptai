@@ -42,6 +42,10 @@ export async function brainRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params);
     return { data: await brain.updateActor(id, req.body) };
   });
+  app.post('/actors/:id/confirm', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await brain.confirmActor(id) };
+  });
   app.delete('/actors/:id', write, async (req) => {
     const { id } = idParam.parse(req.params);
     await brain.deleteActor(id);
@@ -56,6 +60,10 @@ export async function brainRoutes(app: FastifyInstance) {
   app.patch('/locations/:id', write, async (req) => {
     const { id } = idParam.parse(req.params);
     return { data: await brain.updateLocation(id, req.body) };
+  });
+  app.post('/locations/:id/confirm', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await brain.confirmLocation(id) };
   });
   app.delete('/locations/:id', write, async (req) => {
     const { id } = idParam.parse(req.params);
@@ -106,9 +114,28 @@ export async function brainRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params);
     return { data: await brain.updateGlossary(id, req.body) };
   });
+  app.post('/glossary/:id/confirm', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await brain.confirmGlossary(id) };
+  });
   app.delete('/glossary/:id', write, async (req) => {
     const { id } = idParam.parse(req.params);
     await brain.deleteGlossary(id);
+    return { data: { ok: true } };
+  });
+
+  // Insights (manual, Ф1)
+  app.post('/clients/:clientId/insights', write, async (req, reply) => {
+    const { clientId } = clientParam.parse(req.params);
+    return reply.status(201).send({ data: await brain.createInsight(clientId, req.body) });
+  });
+  app.patch('/insights/:id', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await brain.updateInsight(id, req.body) };
+  });
+  app.delete('/insights/:id', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    await brain.deleteInsight(id);
     return { data: { ok: true } };
   });
 

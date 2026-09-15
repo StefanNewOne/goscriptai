@@ -3,15 +3,47 @@ import { AppError } from '../lib/errors.js';
 import { transitionClient } from '../domain/clientMachine.js';
 import { publish } from '../events/bus.js';
 import { brainQueue } from '../queues/index.js';
+import { notify } from './notificationService.js';
 import type { ClientStatus, Role } from '../domain/types.js';
 
+// Machine-validated, ATOMIC client transition (invariant 1). The updateMany is
+// guarded on the source status so two concurrent brain jobs can't clobber the
+// client's status — the write applies only if the client is still in `from`.
 async function move(clientId: string, to: ClientStatus, role: Role, data?: Record<string, unknown>) {
   const client = await prisma.client.findUniqueOrThrow({ where: { id: clientId } });
-  const res = transitionClient({ from: client.status as ClientStatus, to, role, data });
+  const from = client.status as ClientStatus;
+  const res = transitionClient({ from, to, role, data });
   if (!res.ok) throw new AppError(res.code === 'FORBIDDEN' ? 'FORBIDDEN' : 'WRONG_STATUS', res.message);
-  await prisma.client.update({ where: { id: clientId }, data: { status: to } });
+  const upd = await prisma.client.updateMany({ where: { id: clientId, status: from }, data: { status: to } });
+  if (upd.count === 0) throw new AppError('WRONG_STATUS', `Клиентот не е повеќе во ${from}.`);
   await publish({ type: 'status.changed', scope: 'client', id: clientId, status: to });
   return res.sideEffects;
+}
+
+// Recover a client whose brain job exhausted its retries so it never stays stuck
+// in a *_RUNNING status (invariant 10). Moves back to the nearest reviewable
+// checkpoint depending on which phase failed, and leaves a trail + notification.
+export async function failClient(clientId: string, job: { kind: string; phase?: string }) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) return;
+  const target: ClientStatus | null =
+    client.status === 'AVATARS_RUNNING'
+      ? 'ANALYST_REVIEW'
+      : client.status === 'ANALYST_RUNNING'
+        ? job.phase === 'profile'
+          ? 'ANALYST_QUESTIONS'
+          : 'INTAKE'
+        : null;
+  if (!target) return; // not stuck in a running state — nothing to recover
+  try {
+    await move(clientId, target, 'ADMIN');
+  } catch {
+    return; // status already moved on by another path
+  }
+  await prisma.brainChange.create({
+    data: { clientId, kind: 'Статус', summary: 'Агентски job падна по 3 обиди — вратено за повторен обид.' },
+  });
+  await notify('agent_failed', { link: `/clients/${clientId}`, payload: { clientId } });
 }
 
 // INTAKE → ANALYST_RUNNING, enqueue the research phase.

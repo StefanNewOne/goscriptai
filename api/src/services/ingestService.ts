@@ -31,6 +31,11 @@ export async function ingestExtraction(clientId: string, filename: string, extra
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw new AppError('NOT_FOUND', 'Клиентот не постои.');
 
+  // Idempotent push: skip a video that's already in the brain (same filename),
+  // so re-pushing a folder never duplicates media/scripts.
+  const dup = await prisma.mediaAsset.findFirst({ where: { clientId, filename } });
+  if (dup) return { mediaAssetId: dup.id, mentions: 0, tags: 0, duplicate: true, status: dup.status };
+
   const asset = await prisma.mediaAsset.create({
     data: { clientId, kind: 'VIDEO', filename, extraction: extraction as never, status: 'PENDING' },
   });
@@ -112,7 +117,7 @@ export async function confirmMedia(mediaId: string) {
 
   const ex = media.extraction as {
     script?: { title?: string; shots?: ShotIn[] };
-    brain?: { tags?: { videoType?: string } };
+    brain?: { tags?: { videoType?: string }; location?: { name?: string; description?: string } };
   };
   const s = ex.script ?? {};
   const content: ScriptContent = { frames: (s.shots ?? []).map(mapShot) };
@@ -130,6 +135,22 @@ export async function confirmMedia(mediaId: string) {
   await prisma.brainChange.create({
     data: { clientId: media.clientId, kind: 'Сценарио', summary: `Потврдено увезено сценарио ${script.code}.` },
   });
+
+  // Propose the filming location (invariant 2) if the extraction captured one and
+  // it isn't already in the brain — deduped by name, awaiting confirmation.
+  const loc = ex.brain?.location;
+  const locName = (loc?.name ?? '').trim();
+  if (locName) {
+    const exists = await prisma.location.findFirst({ where: { clientId: media.clientId, name: { equals: locName, mode: 'insensitive' } } });
+    if (!exists) {
+      await prisma.location.create({
+        data: { clientId: media.clientId, name: locName, description: (loc?.description ?? '').trim(), confirmed: false },
+      });
+      await prisma.brainChange.create({
+        data: { clientId: media.clientId, kind: 'Локација', summary: `Предложена локација „${locName}“ од видео (чека потврда).` },
+      });
+    }
+  }
   return { scriptId: script.id, code: script.code };
 }
 
@@ -149,13 +170,19 @@ export async function ingestProducts(
 ) {
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw new AppError('NOT_FOUND', 'Клиентот не постои.');
+  // Dedup across sources (web/graphics/manual) by name so the same product isn't
+  // proposed twice — protects catalog quality when brains merge multiple sources.
+  const seen = new Set(
+    (await prisma.product.findMany({ where: { clientId }, select: { name: true } })).map((x) => x.name.trim().toLowerCase()),
+  );
   let created = 0;
   for (const p of products) {
-    if (!p?.name) continue;
+    const name = (p?.name ?? '').trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
     await prisma.product.create({
       data: {
         clientId,
-        name: p.name,
+        name,
         category: p.category ?? null,
         price: p.price != null ? p.price : null,
         usp: p.essence ?? null,
@@ -163,6 +190,7 @@ export async function ingestProducts(
         active: true,
       },
     });
+    seen.add(name.toLowerCase());
     created++;
   }
   if (created > 0) {
@@ -171,6 +199,72 @@ export async function ingestProducts(
     });
   }
   return { created };
+}
+
+// Graphics → Brain. A Gemini image reading yields catalog PROPOSALS (products/
+// offers) and brand-voice PROPOSALS (slogans/taglines). Everything lands as
+// PENDING (confirmed=false) — the scriptwriter confirms (invariant 2). Slogans
+// become PREFERRED glossary terms so the Writer can echo the client's own voice.
+// Catalog↔mentions stays intact: what a graphic SAYS is a proposal, not truth;
+// essence matters more than the printed price. POST /clients/:id/graphics.
+export async function ingestGraphics(
+  clientId: string,
+  data: {
+    products?: { name?: string; category?: string; price?: number; essence?: string }[];
+    slogans?: string[];
+    brandNotes?: string;
+  },
+) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new AppError('NOT_FOUND', 'Клиентот не постои.');
+
+  const seenProducts = new Set(
+    (await prisma.product.findMany({ where: { clientId }, select: { name: true } })).map((x) => x.name.trim().toLowerCase()),
+  );
+  let productsCreated = 0;
+  for (const p of data.products ?? []) {
+    const name = (p?.name ?? '').trim();
+    if (!name || seenProducts.has(name.toLowerCase())) continue;
+    await prisma.product.create({
+      data: {
+        clientId,
+        name,
+        category: p.category ?? null,
+        price: p.price != null ? p.price : null,
+        usp: p.essence ?? null,
+        confirmed: false,
+        active: true,
+      },
+    });
+    seenProducts.add(name.toLowerCase());
+    productsCreated++;
+  }
+
+  const existingTerms = new Set(
+    (await prisma.glossaryTerm.findMany({ where: { clientId }, select: { term: true } })).map((g) => g.term.toLowerCase()),
+  );
+  let slogansCreated = 0;
+  for (const raw of data.slogans ?? []) {
+    const term = (raw ?? '').trim();
+    if (!term || existingTerms.has(term.toLowerCase())) continue;
+    await prisma.glossaryTerm.create({
+      data: { clientId, language: client.language, term, meaning: 'Слоган/порака од графика', kind: 'PREFERRED', confirmed: false },
+    });
+    existingTerms.add(term.toLowerCase());
+    slogansCreated++;
+  }
+
+  if (productsCreated > 0 || slogansCreated > 0 || data.brandNotes) {
+    const notes = data.brandNotes ? ` · бренд: ${data.brandNotes.slice(0, 200)}` : '';
+    await prisma.brainChange.create({
+      data: {
+        clientId,
+        kind: 'Графика',
+        summary: `Од графики: ${productsCreated} продукти, ${slogansCreated} слогани (чекаат потврда)${notes}.`,
+      },
+    });
+  }
+  return { products: productsCreated, slogans: slogansCreated };
 }
 
 // Store the full scraped site text on the client — raw material the Client

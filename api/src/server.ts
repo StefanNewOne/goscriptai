@@ -17,6 +17,7 @@ import { streamRoutes } from './routes/stream.js';
 import { setRoutes } from './routes/sets.js';
 import { opsRoutes } from './routes/ops.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { intakeRoutes } from './routes/intake.js';
 import { registerWorkers } from './queues/index.js';
 
 // Fastify bootstrap. Routes are thin (validate → service → respond); all
@@ -80,6 +81,7 @@ export async function buildServer() {
   await app.register(setRoutes, { prefix: '/api/v1' });
   await app.register(opsRoutes, { prefix: '/api/v1' });
   await app.register(catalogRoutes, { prefix: '/api/v1' });
+  await app.register(intakeRoutes, { prefix: '/api/v1' });
 
   // Agent job workers run in-process (dev). Every agent phase is a BullMQ job.
   registerWorkers();

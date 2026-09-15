@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { suggestClientCode, isValidClientCode } from '../domain/code.js';
 import { transitionClient } from '../domain/clientMachine.js';
+import { publish } from '../events/bus.js';
 import type { Role } from '../domain/types.js';
 import type { CreateClientInput, UpdateClientInput } from '../schemas/client.js';
 
@@ -24,6 +25,7 @@ export async function getClient(id: string) {
       competitors: true,
       references: true,
       glossary: true,
+      insights: { orderBy: { weight: 'desc' } },
       changeLog: { orderBy: { createdAt: 'desc' }, take: 20 },
     },
   });
@@ -111,9 +113,14 @@ export async function updateClient(id: string, input: UpdateClientInput) {
 // Advance the client onboarding machine (the only place status changes — invariant 1).
 export async function advanceClient(id: string, to: string, role: Role, data?: Record<string, unknown>) {
   const client = await getClient(id);
-  const result = transitionClient({ from: client.status as never, to: to as never, role, data });
+  const from = client.status;
+  const result = transitionClient({ from: from as never, to: to as never, role, data });
   if (!result.ok) throw new AppError(result.code === 'FORBIDDEN' ? 'FORBIDDEN' : 'WRONG_STATUS', result.message);
-  const updated = await prisma.client.update({ where: { id }, data: { status: to as never } });
+  // Guarded on the source status (invariant 1): applies only if still in `from`.
+  const res = await prisma.client.updateMany({ where: { id, status: from }, data: { status: to as never } });
+  if (res.count === 0) throw new AppError('WRONG_STATUS', 'Статусот на клиентот се промени во меѓувреме.');
+  await publish({ type: 'status.changed', scope: 'client', id, status: to });
+  const updated = await prisma.client.findUniqueOrThrow({ where: { id } });
   return { client: updated, sideEffects: result.sideEffects };
 }
 

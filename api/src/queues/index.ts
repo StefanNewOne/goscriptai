@@ -56,6 +56,17 @@ export function registerWorkers() {
     void import('../services/setService.js').then(({ failSet }) => failSet(setId).catch(() => {}));
   });
 
+  // Same guarantee for brain jobs: a client whose analyst/avatar job exhausts
+  // its retries is recovered to the nearest checkpoint, never left in *_RUNNING.
+  brainWorker.on('failed', (job, _err) => {
+    if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+    const data = job.data as { clientId?: string; kind?: string; phase?: string };
+    if (!data.clientId || !data.kind) return;
+    void import('../services/onboardingService.js').then(({ failClient }) =>
+      failClient(data.clientId!, { kind: data.kind!, phase: data.phase }).catch(() => {}),
+    );
+  });
+
   workers.push(brainWorker, setWorker);
 }
 
