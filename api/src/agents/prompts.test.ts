@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   avatarBrief,
   scriptSkeleton,
+  marketFraming,
   buildCreativeDirectorPrompt,
   buildWriterPrompt,
   buildCriticPrompt,
@@ -59,7 +60,25 @@ describe('scriptSkeleton', () => {
   });
 });
 
+describe('marketFraming (F2)', () => {
+  it('MK → Macedonian viewer, SQ → Albanian viewer, BOTH → both', () => {
+    expect(marketFraming('MK')).toContain('МАКЕДОНСКИ гледач');
+    expect(marketFraming('SQ')).toContain('АЛБАНСКИ гледач');
+    const both = marketFraming('BOTH');
+    expect(both).toContain('МАКЕДОНСКИ');
+    expect(both).toContain('АЛБАНСКИ');
+  });
+  it('always warns against translated adspeak', () => {
+    expect(marketFraming('MK')).toContain('Избегнувај калкиран рекламен англиски тон');
+  });
+});
+
 describe('buildCreativeDirectorPrompt', () => {
+  it('injects local-audience framing for the client language (F2)', () => {
+    expect(buildCreativeDirectorPrompt(cdBase)).toContain('АУДИТОРИУМ — пишуваш за МАКЕДОНСКИ гледач');
+    expect(buildCreativeDirectorPrompt({ ...cdBase, language: 'SQ' })).toContain('АЛБАНСКИ гледач');
+  });
+
   it('includes client, doubled concept count, product and exact-id instruction', () => {
     const p = buildCreativeDirectorPrompt(cdBase);
     expect(p).toContain('Клиент: Алекс (јазик MK)');
@@ -97,6 +116,11 @@ describe('buildCreativeDirectorPrompt', () => {
 });
 
 describe('buildWriterPrompt', () => {
+  it('injects local-audience framing on a fresh script (F2)', () => {
+    expect(buildWriterPrompt(writerBase)).toContain('АУДИТОРИУМ — пишуваш за МАКЕДОНСКИ гледач');
+    expect(buildWriterPrompt({ ...writerBase, revision: true, comment: 'x' })).not.toContain('АУДИТОРИУМ');
+  });
+
   it('new script: language, rich-field ask, hook, avatar, catalog, actor limits', () => {
     const p = buildWriterPrompt(writerBase);
     expect(p).toContain('Напиши цело реел-сценарио на јазик MK');
@@ -144,6 +168,7 @@ describe('buildCriticPrompt', () => {
     });
     expect(p).toContain('Оцени го сценариото по 11-те критериуми (1–5)');
     expect(p).toContain('Јазик: MK');
+    expect(p).toContain('АУДИТОРИУМ — пишуваш за МАКЕДОНСКИ гледач'); // F2
     expect(p).toContain('ЗАБРАНЕТИ фрази (сценариото НЕ смее да ги содржи): најдобри на пазарот');
     expect(p).toContain('• Пакет А');
     expect(p).toContain('антиГенеричност');
