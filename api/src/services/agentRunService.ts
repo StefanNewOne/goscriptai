@@ -10,6 +10,7 @@ export async function startRun(params: {
   clientId: string;
   setId?: string;
   conceptId?: string;
+  language?: string; // BOTH clients: which language version a writer run wrote
   agentKind: AgentKind;
   model: string;
   scope: string; // 'client' | 'set'
@@ -20,6 +21,7 @@ export async function startRun(params: {
       clientId: params.clientId,
       setId: params.setId,
       conceptId: params.conceptId,
+      language: params.language,
       agentKind: params.agentKind,
       model: params.model,
       status: 'RUNNING',

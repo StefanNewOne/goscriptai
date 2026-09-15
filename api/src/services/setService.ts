@@ -134,7 +134,8 @@ export async function returnScript(scriptId: string, userId: string, comment: st
   await prisma.approval.create({ data: { setId: script.setId, clientId: script.clientId, checkpoint: 'SCRIPTS_REVIEW', decision: 'request_changes', comment, userId } });
   // Reflect the revision at set level so the machine and notifications stay in sync.
   if (script.setId) await moveSet(script.setId, ['SCRIPTS_REVIEW'], 'REVISION', 'SCRIPTWRITER');
-  await setQueue.add('writer', { kind: 'writer', setId: script.setId!, conceptId: script.conceptId!, revision: true, comment });
+  // Target THIS script's language version (BOTH clients have two per concept).
+  await setQueue.add('writer', { kind: 'writer', setId: script.setId!, conceptId: script.conceptId!, revision: true, comment, language: script.language, scriptId: script.id });
   return { ok: true };
 }
 
@@ -171,7 +172,12 @@ export async function editScript(scriptId: string, content: ScriptContentT, user
 // can't move the set while slower parallel writers are still producing scripts.
 const SCRIPT_DONE_STATES = ['SCRIPTS_REVIEW', 'CRITIC_FAILED', 'APPROVED', 'EXPORTED'];
 export async function maybeReviewSet(setId: string) {
-  const expected = await prisma.concept.count({ where: { setId, decision: 'SELECTED' } });
+  const set = await prisma.scriptSet.findUniqueOrThrow({ where: { id: setId }, include: { client: { select: { language: true } } } });
+  // A BOTH client produces two versions (-MK/-SQ) per selected concept, so the
+  // set isn't review-ready until twice as many scripts are done (invariant 8) —
+  // otherwise a fast critic would move the set before the SQ version is written.
+  const multiplier = set.client.language === 'BOTH' ? 2 : 1;
+  const expected = (await prisma.concept.count({ where: { setId, decision: 'SELECTED' } })) * multiplier;
   const scripts = await prisma.script.findMany({ where: { setId } });
   const allDone = scripts.length >= Math.max(1, expected) && scripts.every((s) => SCRIPT_DONE_STATES.includes(s.status));
   if (allDone) {
@@ -222,13 +228,15 @@ export async function retrySet(setId: string) {
   if (resume === 'CONCEPTS_GENERATING') {
     await setQueue.add('creative_director', { kind: 'creative_director', setId });
   } else {
-    // Re-run writers for any concept without a review-ready script.
+    // Re-run writers for any concept without a review-ready script. Enqueue a
+    // FRESH job (no language) — the writer's fresh path is idempotent per
+    // (concept, language): it reuses done versions and only (re)creates missing
+    // ones, so this recovers both -MK/-SQ versions for a BOTH client too.
     const selected = await prisma.concept.findMany({ where: { setId, decision: 'SELECTED' } });
     for (const c of selected) {
-      const script = await prisma.script.findFirst({ where: { setId, conceptId: c.id } });
-      if (!script || !['SCRIPTS_REVIEW', 'APPROVED', 'EXPORTED'].includes(script.status)) {
-        await setQueue.add('writer', { kind: 'writer', setId, conceptId: c.id, revision: !!script });
-      }
+      const scripts = await prisma.script.findMany({ where: { setId, conceptId: c.id } });
+      const allReady = scripts.length > 0 && scripts.every((s) => ['SCRIPTS_REVIEW', 'APPROVED', 'EXPORTED'].includes(s.status));
+      if (!allReady) await setQueue.add('writer', { kind: 'writer', setId, conceptId: c.id });
     }
   }
   return { ok: true, resumedTo: resume };

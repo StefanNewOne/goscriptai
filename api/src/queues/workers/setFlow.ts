@@ -16,8 +16,24 @@ import { setQueue } from '../index.js';
 
 export type SetJob =
   | { kind: 'creative_director'; setId: string }
-  | { kind: 'writer'; setId: string; conceptId: string; revision?: boolean; comment?: string }
+  // language/scriptId target ONE language version on revision (BOTH clients have
+  // two per concept); both are omitted on fresh generation.
+  | { kind: 'writer'; setId: string; conceptId: string; revision?: boolean; comment?: string; language?: string; scriptId?: string }
   | { kind: 'critic'; setId: string; scriptId: string };
+
+// A Writer's structured output — the script plus the rich delivered-document fields.
+interface WriterDraft {
+  title: string;
+  content: ScriptContent;
+  format?: string;
+  vibe?: string;
+  music?: string;
+  platforms?: string[];
+  durationSec?: number;
+  hookVariants?: string[];
+  captions?: string[];
+  productionNote?: string;
+}
 
 export async function runSetJob(job: SetJob): Promise<void> {
   if (job.kind === 'creative_director') return creativeDirector(job.setId);
@@ -140,126 +156,189 @@ async function creativeDirector(setId: string) {
   }
 }
 
+// What the Writer produces + persists for ONE language version of a concept.
+interface LangResult {
+  lang: string;
+  run: { id: string };
+  drafted: WriterDraft;
+  rich: Record<string, unknown>;
+  session?: string;
+  costUsd: number;
+  script?: { id: string; code: string; status: string };
+  needsCritic: boolean;
+  finished: boolean;
+}
+
 async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
   const concept = await prisma.concept.findUniqueOrThrow({ where: { id: job.conceptId }, include: { actor: true, location: true, set: { include: { client: true } } } });
   const set = concept.set;
   const client = set.client;
   const actorName = concept.actor?.name ?? 'Актер';
+  const actor = concept.actor;
   const card = concept.card as { hook: string; insight?: string; why?: string };
+  const brief = set.brief as { product?: string; notes?: string };
 
   const routing = await getRouting('writer');
   const system = await getSystemPrompt('writer');
-  const run = await startRun({ clientId: set.clientId, setId: set.id, conceptId: concept.id, agentKind: 'writer', model: routing.model, scope: 'set', scopeId: set.id });
+
+  // BOTH clients get two versions per concept (-MK/-SQ, invariant 8) sharing one
+  // NN; a revision targets exactly ONE language version (job.language).
+  const isBoth = client.language === 'BOTH';
+  const langs: string[] = job.revision ? [job.language ?? client.language] : isBoth ? ['MK', 'SQ'] : [client.language];
+
+  // Move set into CRITIC phase once. Tolerant of concurrent writers AND of a
+  // revision in progress: a returned script leaves the set in REVISION and an
+  // auto-revision leaves it in CRITIC_RUNNING — both must land in CRITIC_RUNNING
+  // so the set status reflects reality (invariant 1/10), not silently no-op.
+  await moveSet(set.id, ['SCRIPTS_WRITING', 'REVISION', 'CRITIC_RUNNING'], 'CRITIC_RUNNING');
+
+  const stub = isStubMode();
+  // Language-independent context — loaded once, reused for each language.
+  let banned: string[] = [];
+  let preferred: string[] = [];
+  let voiceCard = '';
+  let skeletons: string[] = [];
+  let catalog: string[] = [];
+  let avatar: { name?: string; profile?: unknown } | null = null;
+  if (!stub) {
+    ({ banned, preferred } = await loadGlossary(set.clientId));
+    const voice = await loadVoice(set.clientId);
+    voiceCard = voice.voiceCard;
+    skeletons = voice.skeletons;
+    catalog = await loadCatalog(set.clientId);
+    avatar = concept.avatarId ? await prisma.avatar.findUnique({ where: { id: concept.avatarId } }) : null;
+  }
+
+  const results: LangResult[] = [];
   try {
-    const brief = set.brief as { product?: string; notes?: string };
-    let drafted: {
-      title: string;
-      content: ScriptContent;
-      format?: string;
-      vibe?: string;
-      music?: string;
-      platforms?: string[];
-      durationSec?: number;
-      hookVariants?: string[];
-      captions?: string[];
-      productionNote?: string;
-    };
-    let writerSession: string | undefined;
-    let costUsd = isStubMode() ? 0.4 : 0;
-    if (isStubMode()) {
-      drafted = stubScript({ actorName, hook: card.hook, product: brief.product });
-    } else {
-      const { banned, preferred } = await loadGlossary(set.clientId);
-      const voice = await loadVoice(set.clientId);
-      const catalog = await loadCatalog(set.clientId);
-      const actor = concept.actor;
-      const avatar = concept.avatarId ? await prisma.avatar.findUnique({ where: { id: concept.avatarId } }) : null;
-      // Resume the session for THIS concept (invariant 4) — not just any writer
-      // run on the set, or parallel writers would resume each other's context.
-      const priorRun = job.revision ? await prisma.agentRun.findFirst({ where: { setId: set.id, conceptId: concept.id, agentKind: 'writer', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } }) : null;
-      const prompt = buildWriterPrompt({
-        brief: brief.notes,
-        language: client.language,
-        revision: job.revision,
-        comment: job.comment,
-        hook: card.hook,
-        insight: card.insight,
-        why: card.why,
-        scriptType: concept.type,
-        avatar,
-        product: brief.product,
-        catalog,
-        actorName,
-        actorStyle: actor?.style ?? null,
-        actorCannotDo: actor?.cannotDo,
-        location: concept.location,
-        preferred,
-        banned,
-        voiceCard: voice.voiceCard,
-        skeletons: voice.skeletons,
-      });
-      const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: scriptSchema, sessionId: priorRun?.sessionId ?? undefined });
-      drafted = parseAgentJson<typeof drafted>(res);
-      writerSession = res.sessionId;
-      costUsd = res.costUsd;
-    }
-
-    // Rich delivered-document fields (scenario-templejt) — stored alongside the
-    // frames so the export can render the full document the scriptwriter delivers.
-    const rich = {
-      format: drafted.format ?? null,
-      vibe: drafted.vibe ?? null,
-      music: drafted.music ?? null,
-      platforms: drafted.platforms ?? [],
-      durationSec: drafted.durationSec != null ? Math.round(drafted.durationSec) : null,
-      hookVariants: drafted.hookVariants ?? [],
-      captions: drafted.captions ?? [],
-      productionNote: drafted.productionNote ?? null,
-    };
-
-    // Move set into CRITIC phase. Tolerant of concurrent writers AND of a
-    // revision in progress: a returned script leaves the set in REVISION and an
-    // auto-revision leaves it in CRITIC_RUNNING — both must land in CRITIC_RUNNING
-    // so the set status reflects reality (invariant 1/10), not silently no-op.
-    await moveSet(set.id, ['SCRIPTS_WRITING', 'REVISION', 'CRITIC_RUNNING'], 'CRITIC_RUNNING');
-
-    let script = await prisma.script.findFirst({ where: { setId: set.id, conceptId: concept.id } });
-    if (script && job.revision) {
-      const nn = Number.parseInt(script.code.split('-')[2] ?? '1', 10);
-      const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code: script.code, ...rich }, drafted.content);
-      await prisma.scriptVersion.create({ data: { scriptId: script.id, version: script.version, content: drafted.content as never, markdown, authoredBy: 'critic-revision', note: job.comment } });
-      script = await prisma.script.update({ where: { id: script.id }, data: { content: drafted.content as never, markdown, version: { increment: 1 }, status: 'CRITIC_RUNNING', ...rich } });
-    } else if (!script) {
-      // Parallel writers race on code allocation; retry on unique collision so
-      // each script gets the next free NN (invariant 7).
-      for (let attempt = 0; attempt < 8 && !script; attempt++) {
-        const existing = await prisma.script.findMany({ where: { clientId: set.clientId, code: { startsWith: `${client.code}-${set.yymm}-` } }, select: { code: true } });
-        const nn = nextSequence(existing.map((e) => e.code), client.code, set.yymm);
-        const code = buildCode({ clientCode: client.code, yymm: set.yymm, nn });
-        const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code, ...rich }, drafted.content);
-        try {
-          script = await prisma.script.create({
-            data: {
-              clientId: set.clientId, setId: set.id, conceptId: concept.id, code, title: drafted.title, type: concept.type,
-              language: client.language, avatarId: concept.avatarId, actorIds: concept.actorId ? [concept.actorId] : [], locationId: concept.locationId,
-              content: drafted.content as never, markdown, status: 'CRITIC_RUNNING', source: 'GENERATED', ...rich,
-            },
-          });
-        } catch (e) {
-          if ((e as { code?: string }).code === 'P2002') continue; // code taken, retry with next NN
-          throw e;
-        }
+    // ── Draft each language version (its own agent run + resumable session) ──
+    for (const lang of langs) {
+      const run = await startRun({ clientId: set.clientId, setId: set.id, conceptId: concept.id, language: isBoth ? lang : undefined, agentKind: 'writer', model: routing.model, scope: 'set', scopeId: set.id });
+      const r: LangResult = { lang, run, drafted: { title: '', content: { frames: [] } }, rich: {}, costUsd: stub ? 0.4 : 0, needsCritic: false, finished: false };
+      results.push(r);
+      if (stub) {
+        r.drafted = stubScript({ actorName, hook: card.hook, product: brief.product });
+      } else {
+        // Resume the session for THIS concept+language (invariant 4) — filtered by
+        // language too, so a BOTH client's parallel MK/SQ writers don't resume
+        // each other's context.
+        const priorRun = job.revision
+          ? await prisma.agentRun.findFirst({ where: { setId: set.id, conceptId: concept.id, agentKind: 'writer', sessionId: { not: null }, ...(isBoth ? { language: lang } : {}) }, orderBy: { createdAt: 'desc' } })
+          : null;
+        const prompt = buildWriterPrompt({
+          brief: brief.notes,
+          language: lang,
+          revision: job.revision,
+          comment: job.comment,
+          hook: card.hook,
+          insight: card.insight,
+          why: card.why,
+          scriptType: concept.type,
+          avatar,
+          product: brief.product,
+          catalog,
+          actorName,
+          actorStyle: actor?.style ?? null,
+          actorCannotDo: actor?.cannotDo,
+          location: concept.location,
+          preferred,
+          banned,
+          voiceCard,
+          skeletons,
+        });
+        const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: scriptSchema, sessionId: priorRun?.sessionId ?? undefined });
+        r.drafted = parseAgentJson<WriterDraft>(res);
+        r.session = res.sessionId;
+        r.costUsd = res.costUsd;
       }
-      if (!script) throw new Error('Не можев да алоцирам код за сценарио.');
+      // Rich delivered-document fields — stored alongside the frames so the
+      // export can render the full document the scriptwriter delivers.
+      r.rich = {
+        format: r.drafted.format ?? null,
+        vibe: r.drafted.vibe ?? null,
+        music: r.drafted.music ?? null,
+        platforms: r.drafted.platforms ?? [],
+        durationSec: r.drafted.durationSec != null ? Math.round(r.drafted.durationSec) : null,
+        hookVariants: r.drafted.hookVariants ?? [],
+        captions: r.drafted.captions ?? [],
+        productionNote: r.drafted.productionNote ?? null,
+      };
     }
 
-    await recordMessage(run.id, 'script', { code: script!.code }, 'set', set.id);
-    await recordCost({ runId: run.id, clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, usd: costUsd, scope: 'set', scopeId: set.id });
-    await finishRun(run.id, 'DONE', 'set', set.id, 'writer', undefined, writerSession);
+    // ── Persist ──
+    if (job.revision) {
+      const r = results[0]!;
+      const target = job.scriptId
+        ? await prisma.script.findUnique({ where: { id: job.scriptId } })
+        : await prisma.script.findFirst({ where: { setId: set.id, conceptId: concept.id } });
+      if (!target) throw new Error('Нема сценарио за ревизија.');
+      const nn = Number.parseInt(target.code.split('-')[2] ?? '1', 10);
+      const markdown = renderScriptMarkdown({ nn, title: r.drafted.title, type: concept.type, code: target.code, ...r.rich }, r.drafted.content);
+      await prisma.scriptVersion.create({ data: { scriptId: target.id, version: target.version, content: r.drafted.content as never, markdown, authoredBy: 'critic-revision', note: job.comment } });
+      r.script = await prisma.script.update({ where: { id: target.id }, data: { content: r.drafted.content as never, markdown, version: { increment: 1 }, status: 'CRITIC_RUNNING', ...r.rich } });
+      r.needsCritic = true;
+    } else {
+      // Fresh: idempotent per (concept, language) so a retry never duplicates. All
+      // language versions of a concept share ONE NN (invariant 8); collision retry
+      // guards the atomic allocation across parallel writers (invariant 7).
+      const existingForConcept = await prisma.script.findMany({ where: { setId: set.id, conceptId: concept.id } });
+      for (const r of results) {
+        const sib = existingForConcept.find((s) => (isBoth ? s.language === r.lang : true));
+        if (sib) r.script = sib; // already created on a prior attempt — reuse, don't re-critique
+      }
+      const missing = results.filter((r) => !r.script);
+      if (missing.length) {
+        let nn: number | null = existingForConcept.length ? Number.parseInt(existingForConcept[0]!.code.split('-')[2] ?? '1', 10) : null;
+        let created = false;
+        for (let attempt = 0; attempt < 8 && !created; attempt++) {
+          if (nn == null) {
+            const all = await prisma.script.findMany({ where: { clientId: set.clientId, code: { startsWith: `${client.code}-${set.yymm}-` } }, select: { code: true } });
+            nn = nextSequence(all.map((e) => e.code), client.code, set.yymm);
+          }
+          try {
+            const made = await prisma.$transaction(
+              missing.map((r) => {
+                const code = buildCode({ clientCode: client.code, yymm: set.yymm, nn: nn!, language: isBoth ? (r.lang as 'MK' | 'SQ') : undefined });
+                const markdown = renderScriptMarkdown({ nn: nn!, title: r.drafted.title, type: concept.type, code, ...r.rich }, r.drafted.content);
+                return prisma.script.create({
+                  data: {
+                    clientId: set.clientId, setId: set.id, conceptId: concept.id, code, title: r.drafted.title, type: concept.type,
+                    language: (isBoth ? r.lang : client.language) as typeof client.language,
+                    avatarId: concept.avatarId, actorIds: concept.actorId ? [concept.actorId] : [], locationId: concept.locationId,
+                    content: r.drafted.content as never, markdown, status: 'CRITIC_RUNNING', source: 'GENERATED', ...r.rich,
+                  },
+                });
+              }),
+            );
+            missing.forEach((r, idx) => {
+              r.script = made[idx]!;
+              r.needsCritic = true;
+            });
+            created = true;
+          } catch (e) {
+            if ((e as { code?: string }).code === 'P2002') { nn = null; continue; } // code taken, next NN
+            throw e;
+          }
+        }
+        if (missing.some((r) => !r.script)) throw new Error('Не можев да алоцирам код за сценарио.');
+      }
+    }
+
+    // ── Bookkeeping per language run ──
+    for (const r of results) {
+      await recordMessage(r.run.id, 'script', { code: r.script!.code }, 'set', set.id);
+      await recordCost({ runId: r.run.id, clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, usd: r.costUsd, scope: 'set', scopeId: set.id });
+      await finishRun(r.run.id, 'DONE', 'set', set.id, 'writer', undefined, r.session);
+      r.finished = true;
+    }
     if (await enforceBudget(set.id)) return;
-    await setQueue.add('critic', { kind: 'critic', setId: set.id, scriptId: script!.id });
+    for (const r of results) {
+      if (r.needsCritic) await setQueue.add('critic', { kind: 'critic', setId: set.id, scriptId: r.script!.id });
+    }
   } catch (err) {
-    await finishRun(run.id, 'FAILED', 'set', set.id, 'writer', String(err));
+    for (const r of results) {
+      if (!r.finished) await finishRun(r.run.id, 'FAILED', 'set', set.id, 'writer', String(err)).catch(() => {});
+    }
     throw err;
   }
 }
@@ -316,7 +395,7 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
 
     if (outcome === 'AUTO_REVISION') {
       await prisma.script.update({ where: { id: script.id }, data: { status: 'WRITING', revisionRound: { increment: 1 } } });
-      await setQueue.add('writer', { kind: 'writer', setId: script.setId!, conceptId: script.conceptId!, revision: true });
+      await setQueue.add('writer', { kind: 'writer', setId: script.setId!, conceptId: script.conceptId!, revision: true, language: script.language, scriptId: script.id });
       return;
     }
     await prisma.script.update({ where: { id: script.id }, data: { status: outcome === 'REVIEW' ? 'SCRIPTS_REVIEW' : 'CRITIC_FAILED' } });

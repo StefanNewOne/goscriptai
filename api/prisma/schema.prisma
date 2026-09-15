@@ -465,6 +465,7 @@ model AgentRun {
   setId     String?
   set       ScriptSet? @relation(fields: [setId], references: [id])
   conceptId String? // which concept this run wrote — lets a revision resume the RIGHT session
+  language  String? // BOTH clients: which language version this writer run wrote (MK|SQ), so a revision resumes the RIGHT per-language session
   clientId  String
   client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   agentKind String
