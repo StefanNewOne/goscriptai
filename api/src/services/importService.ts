@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
-import { parseScriptText } from '../import/parser.js';
+import { parseScriptText, parseRichScript } from '../import/parser.js';
 import { buildCode, nextSequence, yymmFromDate } from '../domain/code.js';
 import { renderScriptMarkdown, type ScriptContent } from '../domain/scriptFormat.js';
 import type { ScriptType } from '../domain/types.js';
@@ -20,6 +20,16 @@ interface CommitInput {
   locationId?: string;
   isStarExample?: boolean;
   content: ScriptContent;
+  // Rich delivered-document fields (scenario-templejt) — present when importing
+  // an old delivered script.
+  format?: string;
+  vibe?: string;
+  music?: string;
+  platforms?: string[];
+  durationSec?: number;
+  hookVariants?: string[];
+  captions?: string[];
+  productionNote?: string;
 }
 
 // Persist an imported script. Code == ad name (invariant 7); if omitted or
@@ -45,8 +55,18 @@ export async function commit(input: CommitInput) {
   }
 
   const nn = Number.parseInt(code.split('-')[2] ?? '1', 10);
+  const rich = {
+    format: input.format ?? null,
+    vibe: input.vibe ?? null,
+    music: input.music ?? null,
+    platforms: input.platforms ?? [],
+    durationSec: input.durationSec != null ? Math.round(input.durationSec) : null,
+    hookVariants: input.hookVariants ?? [],
+    captions: input.captions ?? [],
+    productionNote: input.productionNote ?? null,
+  };
   const markdown = renderScriptMarkdown(
-    { nn, title: input.title, type: input.type, code },
+    { nn, title: input.title, type: input.type, code, ...rich },
     input.content,
   );
 
@@ -65,6 +85,14 @@ export async function commit(input: CommitInput) {
       status: 'APPROVED',
       isStarExample: input.isStarExample ?? false,
       source: 'IMPORTED',
+      ...rich,
     },
   });
+}
+
+// Parse a delivered scenario document (text) into a rich commit input. Used by
+// the docx/paste import so old scripts land WITH their hook/caption variants and
+// production note — the parts a video can never recover.
+export function parseRich(text: string) {
+  return parseRichScript(text);
 }

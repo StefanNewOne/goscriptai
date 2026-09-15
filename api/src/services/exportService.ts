@@ -33,6 +33,14 @@ export async function exportSet(setId: string) {
     actor: actorName(s.actorIds[0]),
     location: locationName(s.locationId),
     content: s.content as unknown as ScriptContent,
+    format: s.format,
+    vibe: s.vibe,
+    music: s.music,
+    platforms: s.platforms,
+    durationSec: s.durationSec,
+    hookVariants: s.hookVariants,
+    captions: s.captions,
+    productionNote: s.productionNote,
   }));
 
   const now = new Date();

@@ -1,5 +1,50 @@
 import { describe, it, expect } from 'vitest';
-import { parseScriptText } from './parser.js';
+import { parseScriptText, parseRichScript } from './parser.js';
+
+const RICH = `HOTEL BELVI — Дополнително сценарио
+Актери: Тамара
+Локација: Хотел Белви
+Сценарио 11: Ве слушнавме — нов QR систем
+Формат: Presenter — Тамара + demo
+Вајб: Искрено, директно
+Музика: Лесен инструментал
+Платформи: ФБ + ИГ + ТТ
+Времетраење: ~45–50 сек.
+Hook (3 варијанти):
+Вар. 1: „Ги читаме сите ваши критики.“
+Вар. 2: „Не значи дека не ве слушаме.“
+Вар. 3: „Нарачуваш без да чекаш келнер.“
+Кадар по кадар:
+КАДАР 1 (Тамара седи, гледа во камера)
+Реплика: „Ве слушаме.“
+КАДАР 2 (Поблизок кадар)
+Реплика: „И се подобруваме.“
+CTA:
+Дојди во Белви и пробај го новиот систем.
+Caption (3 варијанти):
+„Ве слушнавме. Нов QR систем.“
+„Без чекање келнер.“
+„Вашите критики нè прават подобри.“
+Продукциска забелешка:
+Тонот е клучен: првите кадри искрени. Demo кадрите со читлив екран.`;
+
+describe('parseRichScript (scenario-templejt)', () => {
+  it('extracts hook/caption variants, frames, and production note', () => {
+    const r = parseRichScript(RICH);
+    expect(r.title).toBe('Ве слушнавме — нов QR систем');
+    expect(r.format).toContain('Presenter');
+    expect(r.platforms).toEqual(['ФБ', 'ИГ', 'ТТ']);
+    expect(r.durationSec).toBe(45);
+    expect(r.hookVariants).toHaveLength(3);
+    expect(r.captions).toHaveLength(3);
+    expect(r.productionNote).toContain('Тонот е клучен');
+    // 2 КАДАР frames + 1 CTA frame; roles bookended ХООК…ЦТА.
+    expect(r.content.frames).toHaveLength(3);
+    expect(r.content.frames[0]!.role).toBe('ХООК');
+    expect(r.content.frames.at(-1)!.role).toBe('ЦТА');
+    expect(r.content.frames[0]!.lines[0]).toEqual({ actor: 'Тамара', text: 'Ве слушаме.' });
+  });
+});
 
 const SAMPLE = `СЦЕНАРИО 01 — Ваучер ИУТЕ
 Код: ALEKS-2609-01
