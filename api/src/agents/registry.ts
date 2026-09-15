@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { MIN_PER_CRITERION, MIN_TOTAL_RATIO, type CriterionKey } from '../domain/critic.js';
 
 export type AgentKind =
   | 'client_analyst'
@@ -35,4 +36,26 @@ export async function getRouting(kind: AgentKind): Promise<AgentRouting> {
 export async function getSystemPrompt(kind: AgentKind): Promise<string> {
   const tpl = await prisma.template.findFirst({ where: { kind, active: true }, orderBy: { version: 'desc' } });
   return tpl?.content ?? '';
+}
+
+export interface CriticRubricConfig {
+  minPerCriterion: number; // fallback bar for any criterion not overridden
+  minTotalRatio: number; // 0..1
+  perCriterionMin: Partial<Record<CriterionKey, number>>;
+}
+
+// The critic rubric/threshold from Settings (invariant 9 — editable). Accepts
+// both the object shape { criteria:[{key,min}], minTotalRatio } and the legacy
+// array [{key,min}]; falls back to the code baseline when unset.
+export async function getCriticRubric(): Promise<CriticRubricConfig> {
+  const setting = await prisma.setting.findUnique({ where: { key: 'critic_rubric' } });
+  const value = setting?.value as unknown;
+  const obj = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  const criteria = (Array.isArray(value) ? value : Array.isArray(obj?.criteria) ? obj!.criteria : []) as { key?: string; min?: number }[];
+  const perCriterionMin: Partial<Record<CriterionKey, number>> = {};
+  for (const c of criteria) {
+    if (c?.key && typeof c.min === 'number') perCriterionMin[c.key as CriterionKey] = c.min;
+  }
+  const minTotalRatio = obj && typeof obj.minTotalRatio === 'number' ? obj.minTotalRatio : MIN_TOTAL_RATIO;
+  return { minPerCriterion: MIN_PER_CRITERION, minTotalRatio, perCriterionMin };
 }

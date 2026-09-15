@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
-import { getRouting, getSystemPrompt } from '../../agents/registry.js';
+import { getRouting, getSystemPrompt, getCriticRubric } from '../../agents/registry.js';
 import { isStubMode, runQuery, parseAgentJson } from '../../agents/sdk.js';
 import { conceptsSchema, scriptSchema, criticSchema } from '../../agents/schemas.js';
 import { stubConcepts, stubScript, stubCritic, type StubConcept } from '../../agents/setStubs.js';
@@ -384,7 +384,10 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
       findings = parsed.findings;
       costUsd = res.costUsd;
     }
-    const evaluation = evaluateCritic(scores);
+    // Rubric + threshold are editable from Settings (invariant 9) — read them at
+    // evaluation time instead of the hardcoded baseline.
+    const rubric = await getCriticRubric();
+    const evaluation = evaluateCritic(scores, rubric.minPerCriterion, rubric.minTotalRatio, rubric.perCriterionMin);
     const outcome = nextCriticOutcome(evaluation, script.revisionRound);
     const report = { scores, findings, totalPercent: evaluation.totalPercent, passed: evaluation.passed, failedCriteria: evaluation.failedCriteria };
 

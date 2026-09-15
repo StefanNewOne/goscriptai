@@ -39,18 +39,24 @@ export interface CriticEvaluation {
   belowTotal: boolean;
 }
 
-// Evaluate a full set of scores against the threshold.
+// Evaluate a full set of scores against the threshold. The per-criterion minimum
+// and the total ratio are configurable from Settings (invariant 9); a
+// per-criterion override map lets a single criterion carry a different bar. All
+// arguments default to the code baseline, so callers that pass nothing get the
+// canonical "all ≥ 3 AND total ≥ 80%".
 export function evaluateCritic(
   scores: CriterionScores,
   minPerCriterion: number = MIN_PER_CRITERION,
+  minTotalRatio: number = MIN_TOTAL_RATIO,
+  perCriterionMin?: Partial<Record<CriterionKey, number>>,
 ): CriticEvaluation {
   const values = CRITERIA.map((c) => scores[c] ?? 0);
   const total = values.reduce((a, b) => a + b, 0);
   const max = CRITERIA.length * MAX_SCORE;
   const totalRatio = total / max;
-  const failedCriteria = CRITERIA.filter((c) => (scores[c] ?? 0) < minPerCriterion);
+  const failedCriteria = CRITERIA.filter((c) => (scores[c] ?? 0) < (perCriterionMin?.[c] ?? minPerCriterion));
   const belowMinimum = failedCriteria.length > 0;
-  const belowTotal = totalRatio < MIN_TOTAL_RATIO;
+  const belowTotal = totalRatio < minTotalRatio;
   return {
     passed: !belowMinimum && !belowTotal,
     totalRatio,

@@ -38,6 +38,20 @@ describe('critic', () => {
     expect(e.belowMinimum).toBe(true);
   });
 
+  it('honors a configurable total ratio (invariant 9 editable threshold)', () => {
+    // 3/5 everywhere = 60%. Passes a 0.5 bar, fails the default 0.8.
+    expect(evaluateCritic(scoresOf(3), 3, 0.5).belowTotal).toBe(false);
+    expect(evaluateCritic(scoresOf(3), 3, 0.5).passed).toBe(true);
+    expect(evaluateCritic(scoresOf(3), 3, 0.9).belowTotal).toBe(true);
+  });
+
+  it('honors a per-criterion override map', () => {
+    // All 4s pass the default 3 bar, but a hook-specific 5 bar fails only hook.
+    const e = evaluateCritic(scoresOf(4), 3, 0.8, { hook: 5 });
+    expect(e.failedCriteria).toEqual(['hook']);
+    expect(e.belowMinimum).toBe(true);
+  });
+
   it('routes outcomes: pass → REVIEW', () => {
     expect(nextCriticOutcome(evaluateCritic(scoresOf(5)), 0)).toBe('REVIEW');
   });

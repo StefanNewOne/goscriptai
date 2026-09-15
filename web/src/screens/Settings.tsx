@@ -10,6 +10,27 @@ interface Template {
   content: string;
 }
 
+interface RubricCriterion { key: string; label: string; min: number }
+interface RubricConfig { criteria: RubricCriterion[]; minTotalRatio: number }
+
+// Fallback so the editor renders even before the setting is seeded.
+const DEFAULT_RUBRIC: RubricConfig = {
+  criteria: [
+    { key: 'avatar', label: 'Аватар', min: 3 },
+    { key: 'hook', label: 'Hook', min: 3 },
+    { key: 'essence', label: 'Суштина', min: 3 },
+    { key: 'actorFeasibility', label: 'Изводливост за актерот', min: 3 },
+    { key: 'location', label: 'Локација', min: 3 },
+    { key: 'structure', label: 'Структура', min: 3 },
+    { key: 'cta', label: 'CTA', min: 3 },
+    { key: 'antiGeneric', label: 'Анти-генеричност', min: 3 },
+    { key: 'language', label: 'Јазик', min: 3 },
+    { key: 'duration', label: 'Времетраење', min: 3 },
+    { key: 'accuracy', label: 'Точност', min: 3 },
+  ],
+  minTotalRatio: 0.8,
+};
+
 const KIND_LABEL: Record<string, string> = {
   client_analyst: 'Клиент-анализа',
   avatar_builder: 'Аватари',
@@ -25,6 +46,7 @@ export function Settings() {
   const qc = useQueryClient();
   const { data: templates } = useQuery({ queryKey: ['templates'], queryFn: () => api.get<Template[]>('/settings/templates'), enabled: user?.role === 'ADMIN' });
   const { data: routing } = useQuery({ queryKey: ['routing'], queryFn: () => api.get<Record<string, { model: string; fallback: string; budgetUsd: number }>>('/settings/model_routing'), enabled: user?.role === 'ADMIN' });
+  const { data: rubricRaw } = useQuery({ queryKey: ['rubric'], queryFn: () => api.get<RubricConfig | RubricCriterion[] | null>('/settings/critic_rubric'), enabled: user?.role === 'ADMIN' });
 
   const [selected, setSelected] = useState<string>('creative_director');
   const [draft, setDraft] = useState<string | null>(null);
@@ -50,6 +72,27 @@ export function Settings() {
   const saveRouting = useMutation({
     mutationFn: () => api.put('/settings/model_routing', { value: routingView }),
     onSuccess: () => { setRoutingDraft(null); qc.invalidateQueries({ queryKey: ['routing'] }); },
+  });
+
+  // Critic rubric + threshold — editable and read at evaluation time (invariant 9).
+  // Normalize the legacy array shape into the object shape.
+  const rubricServer: RubricConfig = Array.isArray(rubricRaw)
+    ? { criteria: rubricRaw, minTotalRatio: 0.8 }
+    : rubricRaw ?? DEFAULT_RUBRIC;
+  const [rubricDraft, setRubricDraft] = useState<RubricConfig | null>(null);
+  const rubricView = rubricDraft ?? rubricServer;
+  const rubricDirty = rubricDraft !== null && JSON.stringify(rubricDraft) !== JSON.stringify(rubricServer);
+  const setCriterionMin = (key: string, value: string) => {
+    const n = Math.max(1, Math.min(5, Number(value) || 1));
+    setRubricDraft({ ...rubricView, criteria: rubricView.criteria.map((c) => (c.key === key ? { ...c, min: n } : c)) });
+  };
+  const setTotalPercent = (value: string) => {
+    const pct = Math.max(0, Math.min(100, Number(value) || 0));
+    setRubricDraft({ ...rubricView, minTotalRatio: pct / 100 });
+  };
+  const saveRubric = useMutation({
+    mutationFn: () => api.put('/settings/critic_rubric', { value: rubricView }),
+    onSuccess: () => { setRubricDraft(null); qc.invalidateQueries({ queryKey: ['rubric'] }); },
   });
 
   if (user?.role !== 'ADMIN') {
@@ -96,6 +139,29 @@ export function Settings() {
           <div className="mt-3">
             <button className="h-10 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50" onClick={() => saveRouting.mutate()} disabled={!routingDirty || saveRouting.isPending}>
               Зачувај модели и буџети
+            </button>
+          </div>
+
+          <h2 className="mb-1 mt-8 text-16 font-semibold">Рубрика на критичарот</h2>
+          <p className="mb-3 text-13 text-ink-2">Минимум по критериум (1–5) и вкупен праг. Критичарот ги чита при секое оценување.</p>
+          <div className="overflow-hidden rounded-sheet border border-rule bg-sheet">
+            <div className="grid grid-cols-[1fr_90px] gap-4 border-b border-rule px-4 py-2 text-13 text-ink-2">
+              <span>Критериум</span><span>Мин.</span>
+            </div>
+            {rubricView.criteria.map((c) => (
+              <div key={c.key} className="grid grid-cols-[1fr_90px] items-center gap-4 border-t border-rule px-4 py-2 text-13">
+                <span>{c.label}</span>
+                <input type="number" min="1" max="5" step="1" className="w-full rounded-control border border-rule bg-sheet px-2 py-1 font-mono text-13" value={c.min} onChange={(e) => setCriterionMin(c.key, e.target.value)} />
+              </div>
+            ))}
+            <div className="grid grid-cols-[1fr_90px] items-center gap-4 border-t border-rule px-4 py-2 text-13">
+              <span className="font-medium">Вкупен праг (%)</span>
+              <input type="number" min="0" max="100" step="1" className="w-full rounded-control border border-rule bg-sheet px-2 py-1 font-mono text-13" value={Math.round(rubricView.minTotalRatio * 100)} onChange={(e) => setTotalPercent(e.target.value)} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <button className="h-10 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50" onClick={() => saveRubric.mutate()} disabled={!rubricDirty || saveRubric.isPending}>
+              Зачувај рубрика
             </button>
           </div>
         </div>

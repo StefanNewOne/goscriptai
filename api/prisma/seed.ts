@@ -90,7 +90,8 @@ async function main() {
   }
 
   // ── Settings: rubric, banned phrases, model routing ──────────────
-  await prisma.setting.upsert({ where: { key: 'critic_rubric' }, update: { value: RUBRIC }, create: { key: 'critic_rubric', value: RUBRIC } });
+  const rubricSetting = { criteria: RUBRIC, minTotalRatio: 0.8 };
+  await prisma.setting.upsert({ where: { key: 'critic_rubric' }, update: { value: rubricSetting }, create: { key: 'critic_rubric', value: rubricSetting } });
   await prisma.setting.upsert({ where: { key: 'banned_phrases' }, update: { value: BANNED_PHRASES }, create: { key: 'banned_phrases', value: BANNED_PHRASES } });
   await prisma.setting.upsert({ where: { key: 'model_routing' }, update: { value: MODEL_ROUTING }, create: { key: 'model_routing', value: MODEL_ROUTING } });
 
