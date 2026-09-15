@@ -85,6 +85,31 @@ describe('scriptFormat', () => {
     expect(md).toContain('СЦЕНАРИО 02 — Тест');
   });
 
+  it('renders the rich delivered-document fields when present (F8)', () => {
+    const md = renderScriptMarkdown(
+      {
+        nn: 3,
+        title: 'Богато',
+        type: 'Продажно',
+        code: 'ALEKS-2609-03',
+        format: 'Presenter + demo',
+        vibe: 'топло',
+        music: 'акустика',
+        platforms: ['Reels', 'TikTok'],
+        hookVariants: ['Хук А', 'Хук Б'],
+        captions: ['Кеп 1'],
+        productionNote: 'снимај на природна светлина',
+      },
+      content,
+    );
+    expect(md).toContain('Формат: Presenter + demo');
+    expect(md).toContain('Платформи: Reels + TikTok');
+    expect(md).toContain('Хук А');
+    expect(md).toContain('Caption');
+    expect(md).toContain('Продукциска забелешка:');
+    expect(md).toContain('снимај на природна светлина');
+  });
+
   it('validates a well-formed script with no warnings', () => {
     expect(validateContent(content)).toHaveLength(0);
   });

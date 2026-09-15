@@ -141,7 +141,26 @@ export async function returnScript(scriptId: string, userId: string, comment: st
 export async function editScript(scriptId: string, content: ScriptContentT, userId: string) {
   const script = await prisma.script.findUniqueOrThrow({ where: { id: scriptId } });
   const nn = Number.parseInt(script.code.split('-')[2] ?? '1', 10);
-  const markdown = renderScriptMarkdown({ nn, title: script.title, type: script.type, code: script.code }, content);
+  // Carry the rich delivered-document fields into the re-render, or a manual edit
+  // would drop hook variants / captions / production note from the .md (F8). The
+  // docx export reads DB columns directly, but the stored markdown must stay whole.
+  const markdown = renderScriptMarkdown(
+    {
+      nn,
+      title: script.title,
+      type: script.type,
+      code: script.code,
+      format: script.format,
+      vibe: script.vibe,
+      music: script.music,
+      platforms: script.platforms,
+      durationSec: script.durationSec,
+      hookVariants: script.hookVariants,
+      captions: script.captions,
+      productionNote: script.productionNote,
+    },
+    content,
+  );
   await saveVersion(scriptId, content as ScriptContentT, markdown, userId, 'рачна доработка');
   await prisma.script.update({ where: { id: scriptId }, data: { content: content as never, markdown, version: { increment: 1 } } });
   return { ok: true };
