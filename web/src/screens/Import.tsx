@@ -30,6 +30,25 @@ export function Import() {
   const [code, setCode] = useState('');
   const [star, setStar] = useState(false);
 
+  // Rich .docx upload for old delivered scripts (with hook/caption variants).
+  const [docClient, setDocClient] = useState('');
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const docImport = useMutation({
+    mutationFn: () => {
+      const form = new FormData();
+      form.append('clientId', docClient);
+      form.append('isStarExample', 'true');
+      form.append('file', docFile!);
+      return api.upload<{
+        code: string;
+        hooks: number;
+        captions: number;
+        frames: number;
+        similar: { code: string; similarity: number; source: string }[];
+      }>('/import/document', form);
+    },
+  });
+
   const parse = useMutation({ mutationFn: () => api.post<ParseResult>('/import/parse', { text }), onSuccess: setParsed });
   const commit = useMutation({
     mutationFn: () => api.post<{ code: string }>('/import/commit', { clientId, title: title || 'Увезено сценарио', type, code: code || undefined, isStarExample: star, content: parsed!.content }),
@@ -53,6 +72,59 @@ export function Import() {
   return (
     <div>
       <h1 className="mb-6 text-28 font-semibold">Увоз</h1>
+
+      {!parsed && (
+        <div className="mb-6 max-w-read rounded-sheet border border-rule bg-sheet p-5">
+          <div className="text-14 font-medium">Прикачи стар документ (.docx)</div>
+          <p className="mb-3 text-13 text-ink-2">
+            Стари испорачани сценарија со хук-варијанти, caption и продукциска забелешка → влегуваат како ѕвезда-примери (основа на клиентот).
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-13 text-ink-2">
+              Клиент
+              <select className="mt-1 block h-9 w-52 rounded-control border border-rule px-2 text-14 text-ink" value={docClient} onChange={(e) => setDocClient(e.target.value)}>
+                <option value="">— избери —</option>
+                {clients?.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            <input
+              type="file"
+              accept=".docx"
+              className="text-13"
+              onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              className="h-9 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50"
+              onClick={() => docImport.mutate()}
+              disabled={!docClient || !docFile || docImport.isPending}
+            >
+              {docImport.isPending ? 'Внесувам…' : 'Прикачи и внеси'}
+            </button>
+          </div>
+          {docImport.isError && <p className="mt-2 text-13 text-fail">{(docImport.error as Error).message}</p>}
+          {docImport.data && (
+            <div className="mt-2">
+              <p className="text-13 text-ok">
+                Внесено {docImport.data.code} · {docImport.data.frames} кадри · {docImport.data.hooks} хук-варијанти · {docImport.data.captions} caption.
+              </p>
+              {docImport.data.similar.length > 0 && (
+                <p className="mt-1 text-13 text-ink-2">
+                  Слично на:{' '}
+                  {docImport.data.similar.map((s, i) => (
+                    <span key={s.code}>
+                      {i > 0 && ', '}
+                      <span className="font-mono">{s.code}</span> ({s.similarity}%{s.source === 'GENERATED' ? ', од видео' : ''})
+                    </span>
+                  ))}
+                  {' '}— спореди во Базата на сценарија.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {!parsed && (
         <div className="max-w-read">

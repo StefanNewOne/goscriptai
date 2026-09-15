@@ -50,6 +50,7 @@ export interface Actor {
   canDo: string[];
   cannotDo: string[];
   notes?: string | null;
+  confirmed: boolean;
 }
 
 export interface Location {
@@ -58,6 +59,7 @@ export interface Location {
   description: string;
   usableElements: string[];
   constraints?: string | null;
+  confirmed: boolean;
 }
 
 export interface Competitor {
@@ -83,6 +85,7 @@ export interface GlossaryTerm {
   term: string;
   meaning: string;
   kind: string;
+  confirmed: boolean;
 }
 
 export interface ClientProfile {
@@ -99,6 +102,13 @@ export interface BrainChange {
   createdAt: string;
 }
 
+export interface Insight {
+  id: string;
+  text: string;
+  weight: number;
+  industry?: string | null;
+}
+
 export interface ClientDetail extends ClientListItem {
   profiles: ClientProfile[];
   avatars: Avatar[];
@@ -108,5 +118,6 @@ export interface ClientDetail extends ClientListItem {
   competitors: Competitor[];
   references: TrendReference[];
   glossary: GlossaryTerm[];
+  insights: Insight[];
   changeLog: BrainChange[];
 }

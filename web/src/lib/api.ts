@@ -47,9 +47,27 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return json.data as T;
 }
 
+// Multipart upload (file + fields) — no JSON Content-Type so the browser sets
+// the multipart boundary. Used to import old delivered .docx scripts.
+async function uploadRequest<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+    body: form,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err: ApiError = json?.error ?? { code: 'UNKNOWN', message: 'Настана грешка.' };
+    if (res.status === 401) setToken(null);
+    throw new ApiFail(err);
+  }
+  return json.data as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),
+  upload: <T>(path: string, form: FormData) => uploadRequest<T>(path, form),
 };

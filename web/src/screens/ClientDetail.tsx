@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, NavLink } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { ClientDetail as ClientDetailT, Product } from '../lib/types';
+import type { ClientDetail as ClientDetailT, Product, Actor, GlossaryTerm } from '../lib/types';
 import { mk } from '../i18n/mk';
 import { StatusBadge } from '../components/StatusBadge';
 import { EmptyState } from '../components/EmptyState';
@@ -112,9 +113,104 @@ function Overview({ c }: { c: ClientDetailT }) {
         )}
       </section>
       </div>
+      <IntakePanel clientId={c.id} />
       <ClientIngest clientId={c.id} />
       <ClientSets clientId={c.id} clientCode={c.code} />
     </div>
+  );
+}
+
+interface IntakeJob {
+  id: string;
+  status: string;
+  progress?: string | null;
+  error?: string | null;
+  webUrl?: string | null;
+  videosPath?: string | null;
+  graphicsPath?: string | null;
+  docsPath?: string | null;
+}
+
+const JOB_STATUS: Record<string, { label: string; tone: 'ok' | 'hold' | 'signal' | 'neutral' }> = {
+  PENDING: { label: 'чека работник', tone: 'hold' },
+  RUNNING: { label: 'се обработува', tone: 'signal' },
+  DONE: { label: 'готово', tone: 'ok' },
+  FAILED: { label: 'падна', tone: 'hold' },
+};
+
+// "Полни мозок" — the scriptwriter points to a web URL + LOCAL folders and clicks;
+// a local companion worker (`npm run worker`) does the heavy lifting on this
+// machine and uploads only results. Raw files never leave the machine.
+function IntakePanel({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const [web, setWeb] = useState('');
+  const [videos, setVideos] = useState('');
+  const [graphics, setGraphics] = useState('');
+  const [docs, setDocs] = useState('');
+  const { data: jobs } = useQuery({
+    queryKey: ['intake-jobs', clientId],
+    queryFn: () => api.get<IntakeJob[]>(`/intake/jobs?clientId=${clientId}`),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.status === 'PENDING' || j.status === 'RUNNING') ? 3000 : false),
+  });
+  const create = useMutation({
+    mutationFn: () =>
+      api.post('/intake/jobs', {
+        clientId,
+        webUrl: web || undefined,
+        videosPath: videos || undefined,
+        graphicsPath: graphics || undefined,
+        docsPath: docs || undefined,
+      }),
+    onSuccess: () => {
+      setWeb('');
+      setVideos('');
+      setGraphics('');
+      setDocs('');
+      qc.invalidateQueries({ queryKey: ['intake-jobs', clientId] });
+    },
+  });
+  const anyInput = !!(web || videos || graphics || docs);
+  const field = (label: string, value: string, set: (v: string) => void, ph: string) => (
+    <label className="text-13 text-ink-2">
+      {label}
+      <input className="mt-1 h-9 w-full rounded-control border border-rule px-3 text-14 text-ink" value={value} onChange={(e) => set(e.target.value)} placeholder={ph} />
+    </label>
+  );
+
+  return (
+    <section className="mt-5 rounded-sheet border border-rule bg-sheet p-4">
+      <div className="text-14 font-medium">{mk.client.fillBrain}</div>
+      <p className="mb-3 text-13 text-ink-2">{mk.client.fillBrainHint}</p>
+      <div className="grid grid-cols-2 gap-3">
+        {field('Веб URL', web, setWeb, 'https://...')}
+        {field('Папка со видеа', videos, setVideos, 'C:\\...\\видеа')}
+        {field('Папка со графики', graphics, setGraphics, 'C:\\...\\графики')}
+        {field('Папка со стари сценарија (.docx)', docs, setDocs, 'C:\\...\\сценарија')}
+      </div>
+      {create.isError && <p className="mt-2 text-13 text-fail">{(create.error as Error).message}</p>}
+      <button
+        className="mt-3 h-9 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50"
+        onClick={() => create.mutate()}
+        disabled={!anyInput || create.isPending}
+      >
+        {mk.client.fillBrainStart}
+      </button>
+
+      {!!jobs?.length && (
+        <ul className="mt-4 flex flex-col gap-2 border-t border-rule pt-3">
+          {jobs.map((j) => (
+            <li key={j.id} className="flex items-center gap-3 text-13">
+              <StatusBadge label={(JOB_STATUS[j.status] ?? { label: j.status }).label} tone={JOB_STATUS[j.status]?.tone ?? 'neutral'} />
+              <span className="text-ink-2">
+                {[j.webUrl && 'веб', j.videosPath && 'видеа', j.graphicsPath && 'графики', j.docsPath && 'docs'].filter(Boolean).join(' · ')}
+              </span>
+              {j.progress && <span className="text-ink-2">— {j.progress}</span>}
+              {j.error && <span className="text-fail">— {j.error}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -222,6 +318,7 @@ function Brain({ c, tab }: { c: ClientDetailT; tab: string }) {
         ))}
       </nav>
       <div>
+        {(tab === 'actors' || tab === 'glossary') && <MineButton clientId={c.id} />}
         <BrainTab c={c} tab={tab} />
       </div>
     </div>
@@ -278,6 +375,11 @@ const REFERENCE_FIELDS: FieldDef[] = [
   { name: 'analysis', label: mk.bf.f.analysis, kind: 'textarea' },
   { name: 'transcript', label: mk.bf.f.transcript, kind: 'textarea' },
 ];
+const INSIGHT_FIELDS: FieldDef[] = [
+  { name: 'text', label: mk.bf.f.text, kind: 'textarea', required: true },
+  { name: 'weight', label: mk.bf.f.weight, kind: 'number' },
+  { name: 'industry', label: mk.bf.f.industry, kind: 'text' },
+];
 const GLOSSARY_FIELDS: FieldDef[] = [
   { name: 'language', label: mk.bf.f.language, kind: 'select', required: true, options: langOpts },
   { name: 'term', label: mk.bf.f.term, kind: 'text', required: true },
@@ -327,6 +429,155 @@ function ProductContent({ product: p, clientId }: { product: Product; clientId: 
   );
 }
 
+// A small "Потврди" affordance shared by mined proposals (confirmed=false).
+function ConfirmButton({ entity, id, clientId }: { entity: string; id: string; clientId: string }) {
+  const qc = useQueryClient();
+  const confirm = useMutation({
+    mutationFn: () => api.post(`/${entity}/${id}/confirm`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client', clientId] }),
+  });
+  return (
+    <button
+      className="mt-2 h-8 rounded-control bg-signal px-3 text-13 font-semibold text-white hover:bg-signal-hover disabled:opacity-50"
+      onClick={() => confirm.mutate()}
+      disabled={confirm.isPending}
+    >
+      {mk.brain.confirm}
+    </button>
+  );
+}
+
+// Actor row — shows a "чека потврда" badge + Потврди for mined proposals.
+function ActorContent({ actor: a, clientId }: { actor: Actor; clientId: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-14 font-medium">
+        {a.name}
+        {!a.confirmed && <StatusBadge label={mk.brain.pending} tone="hold" />}
+      </div>
+      <div className="text-13 text-ink-2">
+        {[a.role, a.languages.map((l) => mk.lang[l]).join(', ')].filter(Boolean).join(' · ')}
+      </div>
+      {a.canDo.length > 0 && (
+        <div className="text-13">
+          <span className="text-ink-2">Може: </span>
+          {a.canDo.join(', ')}
+        </div>
+      )}
+      {a.cannotDo.length > 0 && (
+        <div className="text-13">
+          <span className="text-ink-2">Не може: </span>
+          {a.cannotDo.join(', ')}
+        </div>
+      )}
+      {a.notes && <div className="text-13 text-ink-2">{a.notes}</div>}
+      {!a.confirmed && <ConfirmButton entity="actors" id={a.id} clientId={clientId} />}
+    </div>
+  );
+}
+
+// Glossary row — shows a "чека потврда" badge + Потврди for mined proposals.
+function GlossaryContent({ term: g, clientId }: { term: GlossaryTerm; clientId: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-14 font-medium">
+        {g.term} <span className="text-13 font-normal text-ink-2">({mk.lang[g.language]})</span>
+        {!g.confirmed && <StatusBadge label={mk.brain.pending} tone="hold" />}
+      </div>
+      {g.meaning && <div className="text-13 text-ink-2">{g.meaning}</div>}
+      <div className="text-13">{(mk.bf.opt as Record<string, string>)[g.kind] ?? g.kind}</div>
+      {!g.confirmed && <ConfirmButton entity="glossary" id={g.id} clientId={clientId} />}
+    </div>
+  );
+}
+
+// "Извлечи од сценарија" — mines confirmed star scripts into Actor + Glossary
+// proposals (confirmed=false). Calls POST /clients/:id/mine, then refreshes.
+function MineButton({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const mine = useMutation({
+    mutationFn: () => api.post<{ actors: number; glossary: number; scriptsScanned: number }>(`/clients/${clientId}/mine`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client', clientId] }),
+  });
+  const r = mine.data;
+  const message = r
+    ? r.actors + r.glossary === 0
+      ? mk.brain.mineNone
+      : mk.brain.mineDone(r.actors, r.glossary, r.scriptsScanned)
+    : mk.brain.mineHint;
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-sheet border border-rule bg-sheet px-4 py-3">
+      <button
+        className="h-9 shrink-0 rounded-control bg-ink px-3 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50"
+        onClick={() => mine.mutate()}
+        disabled={mine.isPending}
+      >
+        {mine.isPending ? mk.brain.mineRunning : mk.brain.mine}
+      </button>
+      <span className="text-13 text-ink-2">{message}</span>
+    </div>
+  );
+}
+
+interface HookItem {
+  scriptCode: string;
+  scriptTitle: string;
+  direction: string;
+  text: string;
+}
+
+// Хук-библиотека — proven hooks pulled from the client's own confirmed star
+// scripts. Read-only creativity swipe file; each hook is copyable.
+function HookLibrary({ clientId }: { clientId: string }) {
+  const { data: hooks } = useQuery({
+    queryKey: ['client', clientId, 'hooks'],
+    queryFn: () => api.get<HookItem[]>(`/clients/${clientId}/hooks`),
+  });
+  const [copied, setCopied] = useState<number | null>(null);
+  const copy = (i: number, text: string) => {
+    void navigator.clipboard.writeText(text);
+    setCopied(i);
+    setTimeout(() => setCopied((v) => (v === i ? null : v)), 1500);
+  };
+  if (!hooks) return null;
+
+  return (
+    <section className="mb-5 rounded-sheet border border-rule bg-sheet">
+      <div className="border-b border-rule px-4 py-3">
+        <div className="text-14 font-medium">{mk.brain.hooksTitle}</div>
+        <div className="text-13 text-ink-2">{mk.brain.hooksHint}</div>
+      </div>
+      {hooks.length === 0 ? (
+        <p className="px-4 py-4 text-13 text-ink-2">{mk.brain.hooksEmpty}</p>
+      ) : (
+        <ul>
+          {hooks.map((h, i) => {
+            const body = h.text || h.direction;
+            return (
+              <li key={`${h.scriptCode}-${i}`} className="flex items-start justify-between gap-3 border-t border-rule px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="whitespace-pre-wrap font-mono text-14 leading-[1.5]">{body}</p>
+                  <div className="mt-1 text-13 text-ink-2">
+                    <span className="font-mono">{h.scriptCode}</span>
+                    {h.scriptTitle ? ` · ${h.scriptTitle}` : ''}
+                    {h.text && h.direction ? ` · ${h.direction}` : ''}
+                  </div>
+                </div>
+                <button
+                  className="shrink-0 text-13 text-ink-2 underline underline-offset-2 hover:text-ink"
+                  onClick={() => copy(i, body)}
+                >
+                  {copied === i ? mk.brain.copied : mk.brain.copy}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
   switch (tab) {
     case 'profile': {
@@ -372,26 +623,7 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
           fields={ACTOR_FIELDS}
           items={c.actors}
           emptyText="Нема актери. Додади барем еден за да стане клиентот активен."
-          renderContent={(a) => (
-            <div>
-              <div className="text-14 font-medium">{a.name}</div>
-              <div className="text-13 text-ink-2">
-                {a.role} · {a.languages.map((l) => mk.lang[l]).join(', ')}
-              </div>
-              {a.canDo.length > 0 && (
-                <div className="text-13">
-                  <span className="text-ink-2">Може: </span>
-                  {a.canDo.join(', ')}
-                </div>
-              )}
-              {a.cannotDo.length > 0 && (
-                <div className="text-13">
-                  <span className="text-ink-2">Не може: </span>
-                  {a.cannotDo.join(', ')}
-                </div>
-              )}
-            </div>
-          )}
+          renderContent={(a) => <ActorContent actor={a} clientId={c.id} />}
         />
       );
     case 'locations':
@@ -405,7 +637,10 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
           emptyText="Нема локации."
           renderContent={(l) => (
             <div>
-              <div className="text-14 font-medium">{l.name}</div>
+              <div className="flex items-center gap-2 text-14 font-medium">
+                {l.name}
+                {!l.confirmed && <StatusBadge label={mk.brain.pending} tone="hold" />}
+              </div>
               {l.description && <div className="text-13 text-ink-2">{l.description}</div>}
               {l.constraints && (
                 <div className="text-13">
@@ -413,6 +648,7 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
                   {l.constraints}
                 </div>
               )}
+              {!l.confirmed && <ConfirmButton entity="locations" id={l.id} clientId={c.id} />}
             </div>
           )}
         />
@@ -433,30 +669,40 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
                 <StatusBadge label={x.status === 'CONFIRMED' ? 'потврден' : 'чека потврда'} tone={x.status === 'CONFIRMED' ? 'ok' : 'hold'} />
               </div>
               {x.why && <div className="text-13 text-ink-2">{x.why}</div>}
+              {x.doNotCopy && (
+                <div className="text-13">
+                  <span className="text-ink-2">Не копирај: </span>
+                  {x.doNotCopy}
+                </div>
+              )}
+              {x.status !== 'CONFIRMED' && <ConfirmButton entity="competitors" id={x.id} clientId={c.id} />}
             </div>
           )}
         />
       );
     case 'references':
       return (
-        <BrainSection
-          clientId={c.id}
-          entity="references"
-          label={mk.brain.references}
-          fields={REFERENCE_FIELDS}
-          items={c.references}
-          emptyText="Нема референци."
-          renderContent={(r) => (
-            <div>
-              <div className="text-14 font-medium">
-                {bfOpt[r.flag] ?? r.flag}
-                {r.platform ? ` · ${r.platform}` : ''}
+        <div>
+          <HookLibrary clientId={c.id} />
+          <BrainSection
+            clientId={c.id}
+            entity="references"
+            label={mk.brain.references}
+            fields={REFERENCE_FIELDS}
+            items={c.references}
+            emptyText="Нема референци."
+            renderContent={(r) => (
+              <div>
+                <div className="text-14 font-medium">
+                  {bfOpt[r.flag] ?? r.flag}
+                  {r.platform ? ` · ${r.platform}` : ''}
+                </div>
+                {r.url && <div className="truncate text-13 text-ink-2">{r.url}</div>}
+                {r.analysis && <div className="text-13">{r.analysis}</div>}
               </div>
-              {r.url && <div className="truncate text-13 text-ink-2">{r.url}</div>}
-              {r.analysis && <div className="text-13">{r.analysis}</div>}
-            </div>
-          )}
-        />
+            )}
+          />
+        </div>
       );
     case 'glossary':
       return (
@@ -467,19 +713,31 @@ function BrainTab({ c, tab }: { c: ClientDetailT; tab: string }) {
           fields={GLOSSARY_FIELDS}
           items={c.glossary}
           emptyText="Нема термини."
-          renderContent={(g) => (
-            <div>
-              <div className="text-14 font-medium">
-                {g.term} <span className="text-13 text-ink-2">({mk.lang[g.language]})</span>
-              </div>
-              <div className="text-13 text-ink-2">{g.meaning}</div>
-              <div className="text-13">{bfOpt[g.kind] ?? g.kind}</div>
-            </div>
-          )}
+          renderContent={(g) => <GlossaryContent term={g} clientId={c.id} />}
         />
       );
     case 'insights':
-      return <EmptyState text={mk.brain.insightsEmpty} />;
+      return (
+        <div>
+          <p className="mb-3 text-13 text-ink-2">{mk.brain.insightsEmpty}</p>
+          <BrainSection
+            clientId={c.id}
+            entity="insights"
+            label={mk.brain.insights}
+            fields={INSIGHT_FIELDS}
+            items={c.insights}
+            emptyText="Нема инсајти. Додади научено што пали."
+            renderContent={(i) => (
+              <div>
+                <div className="text-14">{i.text}</div>
+                <div className="text-13 text-ink-2">
+                  {[i.industry, `тежина ${i.weight}`].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+            )}
+          />
+        </div>
+      );
     default:
       return null;
   }

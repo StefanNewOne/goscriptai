@@ -22,6 +22,14 @@ interface Script {
   conceptId?: string | null;
   content: ScriptContent;
   criticReport?: CriticReport | null;
+  format?: string | null;
+  vibe?: string | null;
+  music?: string | null;
+  platforms?: string[];
+  durationSec?: number | null;
+  hookVariants?: string[];
+  captions?: string[];
+  productionNote?: string | null;
 }
 interface SetData {
   id: string;
@@ -196,7 +204,20 @@ function Scripts({ set }: { set: SetData }) {
           />
         ) : (
           <ScriptView
-            meta={{ code: current.code, title: current.title, type: typeLabel(current.type), seconds: undefined, version: current.version }}
+            meta={{
+              code: current.code,
+              title: current.title,
+              type: typeLabel(current.type),
+              version: current.version,
+              format: current.format,
+              vibe: current.vibe,
+              music: current.music,
+              platforms: current.platforms,
+              durationSec: current.durationSec,
+              hookVariants: current.hookVariants,
+              captions: current.captions,
+              productionNote: current.productionNote,
+            }}
             content={current.content}
           />
         )}
