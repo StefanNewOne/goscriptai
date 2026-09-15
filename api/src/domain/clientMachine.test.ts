@@ -54,6 +54,12 @@ describe('clientMachine', () => {
     expect(res).toMatchObject({ ok: true, sideEffects: ['RESUME_CLIENT_ANALYST'] });
   });
 
+  it('recovers a failed analyst/avatar job to the nearest checkpoint', () => {
+    // Analyst research fail → INTAKE; avatar fail → ANALYST_REVIEW (invariant 10).
+    expect(transitionClient({ from: 'ANALYST_RUNNING', to: 'INTAKE', role: SW }).ok).toBe(true);
+    expect(transitionClient({ from: 'AVATARS_RUNNING', to: 'ANALYST_REVIEW', role: SW }).ok).toBe(true);
+  });
+
   it('reports checkpoints correctly', () => {
     expect(isClientCheckpoint('ANALYST_REVIEW')).toBe(true);
     expect(isClientCheckpoint('AVATARS_REVIEW')).toBe(true);

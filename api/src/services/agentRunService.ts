@@ -9,6 +9,7 @@ import type { AgentKind } from '../agents/registry.js';
 export async function startRun(params: {
   clientId: string;
   setId?: string;
+  conceptId?: string;
   agentKind: AgentKind;
   model: string;
   scope: string; // 'client' | 'set'
@@ -18,6 +19,7 @@ export async function startRun(params: {
     data: {
       clientId: params.clientId,
       setId: params.setId,
+      conceptId: params.conceptId,
       agentKind: params.agentKind,
       model: params.model,
       status: 'RUNNING',

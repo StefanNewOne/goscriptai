@@ -54,7 +54,9 @@ export const SET_TRANSITIONS: TransitionMap<SetStatus> = {
     checkpoint: true,
   },
   REVISION: {
-    to: ['SCRIPTS_REVIEW'],
+    // A returned script re-enters the writer→critic loop: the redraft goes back
+    // through CRITIC_RUNNING before returning to SCRIPTS_REVIEW.
+    to: ['CRITIC_RUNNING', 'SCRIPTS_REVIEW'],
     allowedRoles: ['SCRIPTWRITER', 'ADMIN'],
     sideEffects: ['RESUME_WRITER'],
   },

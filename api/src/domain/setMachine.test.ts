@@ -42,6 +42,10 @@ describe('setMachine', () => {
     expect(transitionSet({ from: 'REVISION', to: 'SCRIPTS_REVIEW', role: SW }).ok).toBe(true);
   });
 
+  it('routes a returned script back through the critic (REVISION → CRITIC_RUNNING)', () => {
+    expect(transitionSet({ from: 'REVISION', to: 'CRITIC_RUNNING', role: SW }).ok).toBe(true);
+  });
+
   it('allows BUDGET_HOLD and FAILED from generating/writing/critic', () => {
     expect(transitionSet({ from: 'CONCEPTS_GENERATING', to: 'BUDGET_HOLD', role: SW }).ok).toBe(true);
     expect(transitionSet({ from: 'SCRIPTS_WRITING', to: 'FAILED', role: SW }).ok).toBe(true);

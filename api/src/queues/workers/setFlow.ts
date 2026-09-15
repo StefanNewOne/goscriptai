@@ -8,6 +8,7 @@ import { buildCode, nextSequence } from '../../domain/code.js';
 import { renderScriptMarkdown, type ScriptContent } from '../../domain/scriptFormat.js';
 import { evaluateCritic, nextCriticOutcome, type CriterionScores } from '../../domain/critic.js';
 import { moveSet, maybeReviewSet, enforceBudget } from '../../services/setService.js';
+import { listHooks } from '../../services/mineService.js';
 import { notify } from '../../services/notificationService.js';
 import { publish } from '../../events/bus.js';
 import { setQueue } from '../index.js';
@@ -21,6 +22,95 @@ export async function runSetJob(job: SetJob): Promise<void> {
   if (job.kind === 'creative_director') return creativeDirector(job.setId);
   if (job.kind === 'writer') return writer(job);
   return critic(job);
+}
+
+// Load the client's language + glossary (preferred/banned) for any text-writing
+// agent — required input by invariant 8. Only confirmed terms are used so an
+// unconfirmed proposal never steers generation.
+async function loadGlossary(clientId: string) {
+  const glossary = await prisma.glossaryTerm.findMany({ where: { clientId, confirmed: true } });
+  const banned = glossary.filter((g) => g.kind === 'BANNED').map((g) => g.term);
+  const preferred = glossary.filter((g) => g.kind !== 'BANNED').map((g) => `${g.term} (${g.meaning})`);
+  return { banned, preferred };
+}
+
+// Confirmed catalog ESSENCE — the substance the Writer builds real content from,
+// instead of inventing it or borrowing it from an example. Price is deliberately
+// omitted: it changes per set and essence matters more than the exact number
+// (catalog↔mentions separation). Only confirmed products (invariant 2).
+async function loadCatalog(clientId: string) {
+  const products = await prisma.product.findMany({
+    where: { clientId, confirmed: true, active: true },
+    select: { name: true, category: true, usp: true },
+    take: 12,
+  });
+  return products.map((p) => `${p.name}${p.category ? ` (${p.category})` : ''}: ${p.usp ?? '—'}`);
+}
+
+// One-line buyer summary from an avatar profile — grounds concepts/scripts in the
+// buyer (pain/desire/speech) instead of the old scripts.
+function avatarBrief(a: { profile?: unknown }): string {
+  const p = (a.profile ?? {}) as { pain?: string; desire?: string; whyBuy?: string; speech?: string };
+  return [
+    p.pain && `болка: ${p.pain}`,
+    p.desire && `сака: ${p.desire}`,
+    p.whyBuy && `купува зашто: ${p.whyBuy}`,
+    p.speech && `говор: ${p.speech}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
+// A structural SKELETON of a star script: the beat map (role, how many lines,
+// roughly how many words, structural features) with ZERO real sentences. This
+// teaches the client's reel rhythm without leaking any text to copy.
+function scriptSkeleton(content: unknown): string {
+  const frames = ((content as { frames?: SkeletonFrame[] } | null)?.frames ?? []) as SkeletonFrame[];
+  const lines = frames.map((f) => {
+    const ls = f.lines ?? [];
+    const words = ls.reduce((n, l) => n + String(l.text ?? '').trim().split(/\s+/).filter(Boolean).length, 0);
+    const extras = [f.editing ? 'монтажа' : null, f.table ? 'табела-цени' : null, f.subLabel ? 'текст-на-екран' : null].filter(Boolean).join(', ');
+    return `${f.role} — ${ls.length} реплик${ls.length === 1 ? 'а' : 'и'} (~${words} збора)${extras ? ` [${extras}]` : ''}`;
+  });
+  return lines.join('\n');
+}
+interface SkeletonFrame {
+  role?: string;
+  editing?: string;
+  subLabel?: string;
+  table?: unknown;
+  lines?: { text?: string }[];
+}
+
+// The client's VOICE as a compact CARD + a few structural SKELETONS — never raw
+// example text. `data.tone` gives cadence/address/do-don't (not website
+// sentences); skeletons give rhythm (not phrases). Both are guidance, not text
+// to reproduce — this is what stops the Writer recycling existing lines.
+async function loadVoice(clientId: string) {
+  const profile = await prisma.clientProfile.findFirst({ where: { clientId, approved: true }, orderBy: { version: 'desc' } });
+  const data = (profile?.data ?? {}) as { tone?: string };
+  const voiceCard = (data.tone ?? '').trim() || (profile?.markdown ?? '').slice(0, 800);
+  const stars = await prisma.script.findMany({
+    where: { clientId, isStarExample: true },
+    select: { content: true },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+  });
+  const skeletons = stars.map((s) => scriptSkeleton(s.content)).filter((sk) => sk.length > 0);
+  return { voiceCard, skeletons };
+}
+
+// Creativity fuel for the Creative Director: proven hooks (swipe file), manual
+// insights (what works), and DO_NOT_COPY references (what to avoid).
+async function loadInspiration(clientId: string) {
+  const hooks = (await listHooks(clientId)).slice(0, 8);
+  const insights = await prisma.insight.findMany({
+    where: { OR: [{ clientId }, { clientId: null }] },
+    orderBy: { weight: 'desc' },
+    take: 8,
+  });
+  const doNotCopy = await prisma.trendReference.findMany({ where: { clientId, flag: 'DO_NOT_COPY' }, take: 5 });
+  return { hooks, insights, doNotCopy };
 }
 
 async function creativeDirector(setId: string) {
@@ -42,8 +132,20 @@ async function creativeDirector(setId: string) {
     if (isStubMode()) {
       concepts = stubConcepts({ requested: set.requested, clientName: set.client.name, avatarIds, actorIds, locationIds, product: brief.product });
     } else {
-      const ctx = `Клиент: ${set.client.name} (јазик ${set.client.language}). Барани сценарија: ${set.requested} (генерирај ${set.requested * 2} концепти).\nПродукт во фокус: ${brief.product ?? '—'}\nАватари (id·име): ${avatars.map((a) => `${a.id}·${a.name}`).join(', ')}\nАктери (id·име·јазици): ${actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${locations.map((l) => `${l.id}·${l.name}`).join(', ')}`;
-      const res = await runQuery({ systemPrompt: system, prompt: `${ctx}\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`, model: routing.model, schema: conceptsSchema });
+      const { banned, preferred } = await loadGlossary(set.clientId);
+      const voice = await loadVoice(set.clientId);
+      const insp = await loadInspiration(set.clientId);
+      const toneBlock = voice.voiceCard ? `\n\nГЛАС (насока за ДУХ — не реченици за копирање):\n${voice.voiceCard}` : '';
+      const hooksBlock = insp.hooks.length
+        ? `\n\nПРОВЕРЕНИ ХУКОВИ (само инспирација за стил — НЕ копирај и НЕ парафразирај; секој концепт со свеж агол):\n${insp.hooks.map((h) => `• ${h.text || h.direction}`).join('\n')}`
+        : '';
+      const insightBlock = insp.insights.length
+        ? `\n\nИНСАЈТИ (што пали — искористи ги):\n${insp.insights.map((i) => `• ${i.text}`).join('\n')}`
+        : '';
+      const dnc = insp.doNotCopy.map((r) => r.analysis || r.url).filter((s): s is string => !!s);
+      const dncBlock = dnc.length ? `\n\nНЕ ПРАВИ ВАКА (DO_NOT_COPY):\n${dnc.map((s) => `• ${s}`).join('\n')}` : '';
+      const ctx = `Клиент: ${set.client.name} (јазик ${set.client.language}). Барани сценарија: ${set.requested} (генерирај ${set.requested * 2} концепти).\nПродукт во фокус: ${brief.product ?? '—'}\nАватари (користи го ТОЧНИОТ id):\n${avatars.map((a) => `- ${a.id} · ${a.name}${avatarBrief(a) ? ` — ${avatarBrief(a)}` : ''}`).join('\n')}\nАктери (id·име·јазици): ${actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${locations.map((l) => `${l.id}·${l.name}`).join(', ')}\nРечник (имиња на продукти точно; други термини природно, без набивање): ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${banned.join('; ') || '—'}${toneBlock}${hooksBlock}${insightBlock}${dncBlock}`;
+      const res = await runQuery({ systemPrompt: system, prompt: `${ctx}\nСЕКОЈ концепт со РАЗЛИЧЕН агол и свеж хук — не повторувај ги истите потписни фрази од сет до сет.\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`, model: routing.model, schema: conceptsSchema });
       concepts = parseAgentJson<{ concepts: StubConcept[] }>(res).concepts;
       costUsd = res.costUsd;
     }
@@ -74,38 +176,78 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
 
   const routing = await getRouting('writer');
   const system = await getSystemPrompt('writer');
-  const run = await startRun({ clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, scope: 'set', scopeId: set.id });
+  const run = await startRun({ clientId: set.clientId, setId: set.id, conceptId: concept.id, agentKind: 'writer', model: routing.model, scope: 'set', scopeId: set.id });
   try {
     const brief = set.brief as { product?: string };
-    let drafted: { title: string; content: ScriptContent };
+    let drafted: {
+      title: string;
+      content: ScriptContent;
+      format?: string;
+      vibe?: string;
+      music?: string;
+      platforms?: string[];
+      durationSec?: number;
+      hookVariants?: string[];
+      captions?: string[];
+      productionNote?: string;
+    };
     let writerSession: string | undefined;
     let costUsd = isStubMode() ? 0.4 : 0;
     if (isStubMode()) {
       drafted = stubScript({ actorName, hook: card.hook, product: brief.product });
     } else {
-      const glossary = await prisma.glossaryTerm.findMany({ where: { clientId: set.clientId } });
-      const banned = glossary.filter((g) => g.kind === 'BANNED').map((g) => g.term);
-      const preferred = glossary.filter((g) => g.kind !== 'BANNED').map((g) => `${g.term} (${g.meaning})`);
+      const { banned, preferred } = await loadGlossary(set.clientId);
+      const voice = await loadVoice(set.clientId);
+      const catalog = await loadCatalog(set.clientId);
       const actor = concept.actor;
-      const priorRun = job.revision ? await prisma.agentRun.findFirst({ where: { setId: set.id, agentKind: 'writer', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } }) : null;
+      const avatar = concept.avatarId ? await prisma.avatar.findUnique({ where: { id: concept.avatarId } }) : null;
+      const avatarBlock = avatar && avatarBrief(avatar) ? `\nКупувач (аватар „${avatar.name}“) — пиши за НЕГО: ${avatarBrief(avatar)}` : '';
+      // Resume the session for THIS concept (invariant 4) — not just any writer
+      // run on the set, or parallel writers would resume each other's context.
+      const priorRun = job.revision ? await prisma.agentRun.findFirst({ where: { setId: set.id, conceptId: concept.id, agentKind: 'writer', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } }) : null;
+      const catalogBlock = catalog.length
+        ? `\nКАТАЛОГ (суштина за СУПСТАНЦА на сценариото; цената е по сет, не од тука; не измислувај факти):\n${catalog.map((c) => `• ${c}`).join('\n')}`
+        : '';
+      const toneBlock = voice.voiceCard
+        ? `\nГЛАС (задржи го ДУХОТ; потписните фрази во наводници се потпис — најмногу ЕДНАШ, не во секое сценарио):\n${voice.voiceCard}`
+        : '';
+      const exampleBlock = voice.skeletons.length
+        ? `\nТИПИЧНИ ФОРМИ НА КЛИЕНТОТ (само ритам/должини на бит-ови — БЕЗ текст; варирај во рамки, не следи ропски):\n${voice.skeletons.map((sk, i) => `Форма ${i + 1}:\n${sk}`).join('\n\n')}`
+        : '';
       const prompt = job.revision
         ? `Ревидирај го сценариото според коментарот: „${job.comment ?? ''}“. Задржи го форматот §11.`
-        : `Напиши цело реел-сценарио на јазик ${client.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nКонцепт (hook): „${card.hook}“\nПродукт: ${brief.product ?? '—'}\nАктер: ${actorName}${actor?.style ? ` — стил: ${actor.style}` : ''}${actor?.cannotDo?.length ? ` — НЕ МОЖЕ: ${actor.cannotDo.join(', ')}` : ''}\nПретпочитани термини: ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${banned.join('; ') || '—'}\nВрати го во бараниот JSON облик.`;
+        : `Напиши цело реел-сценарио на јазик ${client.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.\nКонцепт (hook): „${card.hook}“${avatarBlock}\nПродукт во фокус: ${brief.product ?? '—'}${catalogBlock}\nАктер: ${actorName}${actor?.style ? ` — стил: ${actor.style}` : ''}${actor?.cannotDo?.length ? ` — НЕ МОЖЕ: ${actor.cannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
       const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: scriptSchema, sessionId: priorRun?.sessionId ?? undefined });
-      drafted = parseAgentJson<{ title: string; content: ScriptContent }>(res);
+      drafted = parseAgentJson<typeof drafted>(res);
       writerSession = res.sessionId;
       costUsd = res.costUsd;
     }
 
-    // Move set into CRITIC phase (tolerant of concurrent writers).
-    await moveSet(set.id, ['SCRIPTS_WRITING'], 'CRITIC_RUNNING');
+    // Rich delivered-document fields (scenario-templejt) — stored alongside the
+    // frames so the export can render the full document the scriptwriter delivers.
+    const rich = {
+      format: drafted.format ?? null,
+      vibe: drafted.vibe ?? null,
+      music: drafted.music ?? null,
+      platforms: drafted.platforms ?? [],
+      durationSec: drafted.durationSec != null ? Math.round(drafted.durationSec) : null,
+      hookVariants: drafted.hookVariants ?? [],
+      captions: drafted.captions ?? [],
+      productionNote: drafted.productionNote ?? null,
+    };
+
+    // Move set into CRITIC phase. Tolerant of concurrent writers AND of a
+    // revision in progress: a returned script leaves the set in REVISION and an
+    // auto-revision leaves it in CRITIC_RUNNING — both must land in CRITIC_RUNNING
+    // so the set status reflects reality (invariant 1/10), not silently no-op.
+    await moveSet(set.id, ['SCRIPTS_WRITING', 'REVISION', 'CRITIC_RUNNING'], 'CRITIC_RUNNING');
 
     let script = await prisma.script.findFirst({ where: { setId: set.id, conceptId: concept.id } });
     if (script && job.revision) {
       const nn = Number.parseInt(script.code.split('-')[2] ?? '1', 10);
-      const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code: script.code }, drafted.content);
+      const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code: script.code, ...rich }, drafted.content);
       await prisma.scriptVersion.create({ data: { scriptId: script.id, version: script.version, content: drafted.content as never, markdown, authoredBy: 'critic-revision', note: job.comment } });
-      script = await prisma.script.update({ where: { id: script.id }, data: { content: drafted.content as never, markdown, version: { increment: 1 }, status: 'CRITIC_RUNNING' } });
+      script = await prisma.script.update({ where: { id: script.id }, data: { content: drafted.content as never, markdown, version: { increment: 1 }, status: 'CRITIC_RUNNING', ...rich } });
     } else if (!script) {
       // Parallel writers race on code allocation; retry on unique collision so
       // each script gets the next free NN (invariant 7).
@@ -113,13 +255,13 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
         const existing = await prisma.script.findMany({ where: { clientId: set.clientId, code: { startsWith: `${client.code}-${set.yymm}-` } }, select: { code: true } });
         const nn = nextSequence(existing.map((e) => e.code), client.code, set.yymm);
         const code = buildCode({ clientCode: client.code, yymm: set.yymm, nn });
-        const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code }, drafted.content);
+        const markdown = renderScriptMarkdown({ nn, title: drafted.title, type: concept.type, code, ...rich }, drafted.content);
         try {
           script = await prisma.script.create({
             data: {
               clientId: set.clientId, setId: set.id, conceptId: concept.id, code, title: drafted.title, type: concept.type,
               language: client.language, avatarId: concept.avatarId, actorIds: concept.actorId ? [concept.actorId] : [], locationId: concept.locationId,
-              content: drafted.content as never, markdown, status: 'CRITIC_RUNNING', source: 'GENERATED',
+              content: drafted.content as never, markdown, status: 'CRITIC_RUNNING', source: 'GENERATED', ...rich,
             },
           });
         } catch (e) {
@@ -153,9 +295,11 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
     if (isStubMode()) {
       ({ scores, findings } = stubCritic());
     } else {
+      const { banned, preferred } = await loadGlossary(script.clientId);
+      const catalog = await loadCatalog(script.clientId);
       const res = await runQuery({
         systemPrompt: system,
-        prompt: `Оцени го сценариото по 11-те критериуми (1–5) и дај наоди со референца на кадар. Јазик: ${script.language}.\nСценарио (markdown):\n${script.markdown}\nВрати ги оценките и наодите во бараниот JSON облик.`,
+        prompt: `Оцени го сценариото по 11-те критериуми (1–5) и дај наоди со референца на кадар. Јазик: ${script.language}.\nПретпочитани термини/имиња на продукти: ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (сценариото НЕ смее да ги содржи): ${banned.join('; ') || '—'}\nКАТАЛОГ (за критериумот „точност" — фактите мора да се совпаѓаат; цена е по сет):\n${catalog.map((c) => `• ${c}`).join('\n') || '—'}\nОРИГИНАЛНОСТ (во критериумот „антиГенеричност"): КАЗНИ рециклирани/клише реплики, реклама-калап и повторени потписни слогани; НАГРАДИ свежи, разговорни, човечки реченици. Ако звучи препишано од веб/стари видеа — ниска оценка + конкретен наод.\nСценарио (markdown):\n${script.markdown}\nВрати ги оценките и наодите во бараниот JSON облик.`,
         model: routing.model,
         schema: criticSchema,
       });

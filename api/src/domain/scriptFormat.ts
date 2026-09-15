@@ -39,6 +39,15 @@ export interface ScriptHeaderMeta {
   location?: string;
   seconds?: number;
   code: string;
+  // Rich delivered-document fields (scenario-templejt).
+  format?: string | null;
+  vibe?: string | null;
+  music?: string | null;
+  platforms?: string[];
+  durationSec?: number | null;
+  hookVariants?: string[];
+  captions?: string[];
+  productionNote?: string | null;
 }
 
 export const FRAME_ROLES: readonly FrameRole[] = ['ХООК', 'БОДИ', 'ЦТА'];
@@ -92,11 +101,34 @@ export function renderScriptMarkdown(meta: ScriptHeaderMeta, content: ScriptCont
   const metaBits = [meta.type, meta.avatar, meta.actor, meta.location]
     .filter(Boolean)
     .join(' · ');
-  const secs = meta.seconds ?? estimateSeconds(content);
+  const secs = meta.durationSec ?? meta.seconds ?? estimateSeconds(content);
   const heading = `СЦЕНАРИО ${String(meta.nn).padStart(2, '0')} — ${meta.title} (${metaBits} · ~${secs}s)`;
   const codeLine = `Код: ${meta.code}`;
+
+  // Shoot metadata (scenario-templejt) — only lines that have a value.
+  const metaLines = [
+    meta.format ? `Формат: ${meta.format}` : null,
+    meta.vibe ? `Вајб: ${meta.vibe}` : null,
+    meta.music ? `Музика: ${meta.music}` : null,
+    meta.platforms?.length ? `Платформи: ${meta.platforms.join(' + ')}` : null,
+    `Времетраење: ~${secs} сек`,
+  ].filter(Boolean);
+
+  const hooks = (meta.hookVariants ?? []).filter((h) => h.trim());
+  const hookBlock = hooks.length
+    ? `\nHook (${hooks.length} ${hooks.length === 1 ? 'варијанта' : 'варијанти'}):\n${hooks.map((h, i) => `Вар. ${i + 1}: „${h.trim()}“`).join('\n')}\n`
+    : '';
+
   const frames = content.frames.map((f, i) => renderFrame(f, i)).join('\n\n');
-  return `${heading}\n${codeLine}\n\n${frames}\n`;
+
+  const captions = (meta.captions ?? []).filter((c) => c.trim());
+  const captionBlock = captions.length
+    ? `\n\nCaption (${captions.length} ${captions.length === 1 ? 'варијанта' : 'варијанти'}):\n${captions.map((c) => `„${c.trim()}“`).join('\n')}`
+    : '';
+
+  const noteBlock = meta.productionNote?.trim() ? `\n\nПродукциска забелешка:\n${meta.productionNote.trim()}` : '';
+
+  return `${heading}\n${codeLine}\n${metaLines.join('\n')}\n${hookBlock}\n${frames}${captionBlock}${noteBlock}\n`;
 }
 
 // Validate a parsed/generated content object against the format rules.

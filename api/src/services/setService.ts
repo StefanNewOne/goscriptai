@@ -88,11 +88,17 @@ export async function decideConcept(conceptId: string, decision: 'SELECTED' | 'R
   return concept;
 }
 
-// "Пиши ги избраните" — fan out one Writer job per selected concept.
-export async function writeSelected(setId: string) {
+// "Пиши ги избраните" — fan out one Writer job per selected concept. This is the
+// human decision at the CONCEPTS_REVIEW checkpoint, so it leaves an Approval
+// trail (invariant 11).
+export async function writeSelected(setId: string, userId: string) {
+  const set = await prisma.scriptSet.findUniqueOrThrow({ where: { id: setId } });
   const selected = await prisma.concept.findMany({ where: { setId, decision: 'SELECTED' } });
   if (selected.length === 0) throw new AppError('WRONG_STATUS', 'Избери барем еден концепт.');
   await moveSet(setId, ['CONCEPTS_REVIEW'], 'SCRIPTS_WRITING', 'SCRIPTWRITER', { selectedCount: selected.length });
+  await prisma.approval.create({
+    data: { setId, clientId: set.clientId, checkpoint: 'CONCEPTS_REVIEW', decision: 'approve', userId, comment: `Избрани ${selected.length} концепти.` },
+  });
   for (const c of selected) {
     await setQueue.add('writer', { kind: 'writer', setId, conceptId: c.id });
   }
@@ -165,8 +171,16 @@ export async function enforceBudget(setId: string): Promise<boolean> {
   const evalr = evaluateBudget(Number(set.spentUsd), Number(set.budgetUsd));
   if (evalr.shouldHold) {
     const res = await moveSet(setId, ['CONCEPTS_GENERATING', 'SCRIPTS_WRITING', 'CRITIC_RUNNING'], 'BUDGET_HOLD');
-    if (res.moved) await prisma.scriptSet.update({ where: { id: setId }, data: { prevStatus: set.status } });
+    if (res.moved) {
+      await prisma.scriptSet.update({ where: { id: setId }, data: { prevStatus: set.status } });
+      await notify('budget_hold', { userId: set.writerUserId, link: `/sets/${setId}`, payload: { setId } });
+    }
     return res.moved;
+  }
+  // 80% warning (invariant 6) — emit once per set (dedup on the stored link).
+  if (evalr.state === 'WARN') {
+    const already = await prisma.notification.findFirst({ where: { event: 'budget_80', link: { contains: `/sets/${setId}` } } });
+    if (!already) await notify('budget_80', { userId: set.writerUserId, link: `/sets/${setId}`, payload: { setId } });
   }
   return false;
 }

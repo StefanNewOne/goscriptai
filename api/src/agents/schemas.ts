@@ -40,6 +40,20 @@ export const profileSchema = {
       },
       additionalProperties: true,
     },
+    // 2–4 proposed competitors — stored as PENDING_CONFIRMATION (invariant 2).
+    competitors: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          why: { type: 'string' },
+          doNotCopy: { type: 'string' },
+        },
+        required: ['name'],
+        additionalProperties: false,
+      },
+    },
   },
   required: ['markdown', 'data'],
   additionalProperties: false,
@@ -114,6 +128,14 @@ export const scriptSchema = {
   type: 'object',
   properties: {
     title: { type: 'string' },
+    format: { type: 'string' },
+    vibe: { type: 'string' },
+    music: { type: 'string' },
+    platforms: { type: 'array', items: { type: 'string' } },
+    durationSec: { type: 'number' },
+    hookVariants: { type: 'array', items: { type: 'string' } },
+    captions: { type: 'array', items: { type: 'string' } },
+    productionNote: { type: 'string' },
     content: {
       type: 'object',
       properties: {

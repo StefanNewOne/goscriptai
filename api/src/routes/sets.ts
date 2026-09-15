@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { z } from 'zod';
 import * as setService from '../services/setService.js';
 import { exportSet } from '../services/exportService.js';
+import { findSimilar, enrichFromSource } from '../services/reconcileService.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 
@@ -52,7 +53,7 @@ export async function setRoutes(app: FastifyInstance) {
 
   app.post('/sets/:id/write', write, async (req) => {
     const { id } = idParam.parse(req.params);
-    return { data: await setService.writeSelected(id) };
+    return { data: await setService.writeSelected(id, req.authUser.id) };
   });
 
   app.post('/sets/:id/retry', write, async (req) => {
@@ -75,6 +76,19 @@ export async function setRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(req.params);
     const { content } = z.object({ content: contentSchema }).parse(req.body);
     return { data: await setService.editScript(id, content, req.authUser.id) };
+  });
+
+  // Reconcile: scripts most similar to this one (find an old doc's video twin).
+  app.get('/scripts/:id/similar', async (req) => {
+    const { id } = idParam.parse(req.params);
+    return { data: await findSimilar(id) };
+  });
+
+  // Carry the rich fields this script lacks over from a similar source script.
+  app.post('/scripts/:id/enrich', write, async (req) => {
+    const { id } = idParam.parse(req.params);
+    const { sourceId } = z.object({ sourceId: z.string() }).parse(req.body);
+    return { data: await enrichFromSource(id, sourceId) };
   });
 
   app.post('/sets/:id/export', write, async (req) => {

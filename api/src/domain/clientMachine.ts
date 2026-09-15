@@ -20,7 +20,9 @@ export const CLIENT_TRANSITIONS: TransitionMap<ClientStatus> = {
     sideEffects: ['ENQUEUE_CLIENT_ANALYST'],
   },
   ANALYST_RUNNING: {
-    to: ['ANALYST_QUESTIONS', 'ANALYST_REVIEW'],
+    // ANALYST_QUESTIONS/REVIEW on success; INTAKE is the failure-recovery edge
+    // when the analyst job exhausts its retries (invariant 10).
+    to: ['ANALYST_QUESTIONS', 'ANALYST_REVIEW', 'INTAKE'],
     allowedRoles: ['SCRIPTWRITER', 'ADMIN'],
   },
   ANALYST_QUESTIONS: {
@@ -36,7 +38,9 @@ export const CLIENT_TRANSITIONS: TransitionMap<ClientStatus> = {
     checkpoint: true,
   },
   AVATARS_RUNNING: {
-    to: ['AVATARS_REVIEW'],
+    // AVATARS_REVIEW on success; ANALYST_REVIEW is the failure-recovery edge
+    // when the avatar job exhausts its retries (invariant 10).
+    to: ['AVATARS_REVIEW', 'ANALYST_REVIEW'],
     allowedRoles: ['SCRIPTWRITER', 'ADMIN'],
   },
   AVATARS_REVIEW: {
