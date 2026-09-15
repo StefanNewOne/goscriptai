@@ -180,8 +180,21 @@ export interface CriticInput {
   banned: string[];
   catalog: string[];
   markdown: string;
+  // Intent to judge against, so "avatar"/"hook"/"structure" aren't judged blind
+  // (F6): the set brief, the concept's buyer, and the concept angle.
+  brief?: string;
+  avatar?: { name?: string; profile?: unknown } | null;
+  conceptHook?: string;
+  conceptInsight?: string;
 }
 
 export function buildCriticPrompt(i: CriticInput): string {
-  return `Оцени го сценариото по 11-те критериуми (1–5) и дај наоди со референца на кадар. Јазик: ${i.language}.\n${marketFraming(i.language)}\nПретпочитани термини/имиња на продукти: ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (сценариото НЕ смее да ги содржи): ${i.banned.join('; ') || '—'}\nКАТАЛОГ (за критериумот „точност" — фактите мора да се совпаѓаат; цена е по сет):\n${i.catalog.map((c) => `• ${c}`).join('\n') || '—'}\nОРИГИНАЛНОСТ (во критериумот „антиГенеричност"): КАЗНИ рециклирани/клише реплики, реклама-калап и повторени потписни слогани; НАГРАДИ свежи, разговорни, човечки реченици. Ако звучи препишано од веб/стари видеа — ниска оценка + конкретен наод.\nСценарио (markdown):\n${i.markdown}\nВрати ги оценките и наодите во бараниот JSON облик.`;
+  const briefBlock = i.brief?.trim() ? `\nБРИФ (намерата за овој сет — провери дали сценариото ѝ служи): ${i.brief.trim()}` : '';
+  const ab = i.avatar ? avatarBrief(i.avatar) : '';
+  const avatarBlock = ab ? `\nАВАТАР (за критериумот „аватар“ — дали сценариото зборува за НЕГО): ${ab}` : '';
+  const conceptBlock =
+    i.conceptHook?.trim() || i.conceptInsight?.trim()
+      ? `\nКОНЦЕПТ: hook „${i.conceptHook?.trim() ?? ''}“${i.conceptInsight?.trim() ? ` · инсајт: ${i.conceptInsight.trim()}` : ''}`
+      : '';
+  return `Оцени го сценариото по 11-те критериуми (1–5) и дај наоди со референца на кадар. Јазик: ${i.language}.\n${marketFraming(i.language)}${briefBlock}${avatarBlock}${conceptBlock}\nПретпочитани термини/имиња на продукти: ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (сценариото НЕ смее да ги содржи): ${i.banned.join('; ') || '—'}\nКАТАЛОГ (за критериумот „точност" — фактите мора да се совпаѓаат; цена е по сет):\n${i.catalog.map((c) => `• ${c}`).join('\n') || '—'}\nОРИГИНАЛНОСТ (во критериумот „антиГенеричност"): КАЗНИ рециклирани/клише реплики, реклама-калап и повторени потписни слогани; НАГРАДИ свежи, разговорни, човечки реченици. Ако звучи препишано од веб/стари видеа — ниска оценка + конкретен наод.\nСценарио (markdown):\n${i.markdown}\nВрати ги оценките и наодите во бараниот JSON облик.`;
 }

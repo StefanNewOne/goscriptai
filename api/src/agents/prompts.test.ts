@@ -219,4 +219,30 @@ describe('buildCriticPrompt', () => {
     const p = buildCriticPrompt({ language: 'MK', preferred: [], banned: [], catalog: [], markdown: 'x' });
     expect(p).toContain('цена е по сет):\n—');
   });
+
+  it('judges against intent: brief, avatar and concept (F6)', () => {
+    const p = buildCriticPrompt({
+      language: 'MK',
+      preferred: [],
+      banned: [],
+      catalog: [],
+      markdown: 'x',
+      brief: 'сезонска акција',
+      avatar: { name: 'Марија', profile: { pain: 'нема време' } },
+      conceptHook: 'Ти се случило ова?',
+      conceptInsight: 'се препознаваат',
+    });
+    expect(p).toContain('БРИФ (намерата за овој сет');
+    expect(p).toContain('сезонска акција');
+    expect(p).toContain('АВАТАР (за критериумот „аватар“');
+    expect(p).toContain('болка: нема време');
+    expect(p).toContain('КОНЦЕПТ: hook „Ти се случило ова?“ · инсајт: се препознаваат');
+  });
+
+  it('omits intent blocks when brief/avatar/concept absent (F6)', () => {
+    const p = buildCriticPrompt({ language: 'MK', preferred: [], banned: [], catalog: [], markdown: 'x' });
+    expect(p).not.toContain('БРИФ (намерата');
+    expect(p).not.toContain('АВАТАР (за критериумот');
+    expect(p).not.toContain('КОНЦЕПТ: hook');
+  });
 });

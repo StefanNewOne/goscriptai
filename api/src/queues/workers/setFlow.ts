@@ -278,9 +278,25 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
     } else {
       const { banned, preferred } = await loadGlossary(script.clientId);
       const catalog = await loadCatalog(script.clientId);
+      // The intent behind the script (F6): its concept (buyer + angle) and the
+      // set brief — so avatar/hook/structure criteria are judged against intent.
+      const concept = script.conceptId ? await prisma.concept.findUnique({ where: { id: script.conceptId }, include: { avatar: true } }) : null;
+      const conceptCard = (concept?.card ?? {}) as { hook?: string; insight?: string };
+      const set = script.setId ? await prisma.scriptSet.findUnique({ where: { id: script.setId } }) : null;
+      const briefNotes = (set?.brief as { notes?: string } | null)?.notes;
       const res = await runQuery({
         systemPrompt: system,
-        prompt: buildCriticPrompt({ language: script.language, preferred, banned, catalog, markdown: script.markdown }),
+        prompt: buildCriticPrompt({
+          language: script.language,
+          preferred,
+          banned,
+          catalog,
+          markdown: script.markdown,
+          brief: briefNotes,
+          avatar: concept?.avatar,
+          conceptHook: conceptCard.hook,
+          conceptInsight: conceptCard.insight,
+        }),
         model: routing.model,
         schema: criticSchema,
       });
