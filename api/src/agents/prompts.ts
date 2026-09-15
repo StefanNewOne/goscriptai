@@ -97,6 +97,24 @@ export function buildCreativeDirectorPrompt(i: CreativeDirectorInput): string {
   return `${ctx}\nСЕКОЈ концепт со РАЗЛИЧЕН агол и свеж хук — не повторувај ги истите потписни фрази од сет до сет.\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`;
 }
 
+// What each script type is FOR — so the Writer knows whether it's building a
+// product offer, an educational piece, a testimonial or a sketch (F4). Empty
+// for an unknown type, so the block is simply omitted.
+export function scriptTypeGuide(type: string): string {
+  switch (type) {
+    case 'PRODUCT_OFFER':
+      return 'Продукт/понуда — конкретна понуда или попуст, јасен CTA (купи/нарачај/дојди) сега.';
+    case 'EDUCATIONAL':
+      return 'Едукативно — научи нешто корисно; вредност прво, продажба меко на крај.';
+    case 'TESTIMONIAL':
+      return 'Тестимонијал — реално искуство/резултат од купувач; доверба преку приказна.';
+    case 'SKETCH':
+      return 'Скеч — кратка играна/хумористична сцена, производот природно вткаен.';
+    default:
+      return '';
+  }
+}
+
 // ── Writer ───────────────────────────────────────────────────────────────
 export interface WriterInput {
   // The scriptwriter's free-text brief for THIS set — top priority; the script
@@ -107,6 +125,11 @@ export interface WriterInput {
   revision?: boolean;
   comment?: string;
   hook: string;
+  // The Creative Director's reasoning for this concept — why the viewer stops
+  // and why the concept should work (F3); and the script type (F4).
+  insight?: string;
+  why?: string;
+  scriptType?: string;
   avatar?: { name?: string; profile?: unknown } | null;
   product?: string;
   catalog: string[];
@@ -130,13 +153,18 @@ export function buildWriterPrompt(i: WriterInput): string {
   const exampleBlock = i.skeletons.length
     ? `\nТИПИЧНИ ФОРМИ НА КЛИЕНТОТ (само ритам/должини на бит-ови — БЕЗ текст; варирај во рамки, не следи ропски):\n${i.skeletons.map((sk, n) => `Форма ${n + 1}:\n${sk}`).join('\n\n')}`
     : '';
+  // Script type (F4) and the Creative Director's concept reasoning (F3).
+  const typeGuide = i.scriptType ? scriptTypeGuide(i.scriptType) : '';
+  const typeBlock = typeGuide ? `\nТип на сценарио: ${typeGuide}` : '';
+  const insightBlock = i.insight?.trim() ? `\nИнсајт (зошто гледачот застанува): ${i.insight.trim()}` : '';
+  const whyBlock = i.why?.trim() ? `\nЗошто овој концепт работи: ${i.why.trim()}` : '';
   // The scriptwriter's brief leads the fresh script — it must fulfil it first (F1).
   const briefBlock = i.brief?.trim()
     ? `БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА за овој сет. Сценариото мора да го исполни ова пред сѐ друго:\n${i.brief.trim()}\n\n`
     : '';
   return i.revision
     ? `Ревидирај го сценариото според коментарот: „${i.comment ?? ''}“. Задржи го форматот §11.`
-    : `${briefBlock}${marketFraming(i.language)}\n\nНапиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.\nКонцепт (hook): „${i.hook}“${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
+    : `${briefBlock}${marketFraming(i.language)}\n\nНапиши цело реел-сценарио на јазик ${i.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.${typeBlock}\nКонцепт (hook): „${i.hook}“${insightBlock}${whyBlock}${avatarBlock}\nПродукт во фокус: ${i.product ?? '—'}${catalogBlock}\nАктер: ${i.actorName}${i.actorStyle ? ` — стил: ${i.actorStyle}` : ''}${i.actorCannotDo?.length ? ` — НЕ МОЖЕ: ${i.actorCannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${i.preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${i.banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
 }
 
 // ── Critic ───────────────────────────────────────────────────────────────

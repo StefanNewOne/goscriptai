@@ -3,6 +3,7 @@ import {
   avatarBrief,
   scriptSkeleton,
   marketFraming,
+  scriptTypeGuide,
   buildCreativeDirectorPrompt,
   buildWriterPrompt,
   buildCriticPrompt,
@@ -115,6 +116,16 @@ describe('buildCreativeDirectorPrompt', () => {
   });
 });
 
+describe('scriptTypeGuide (F4)', () => {
+  it('describes each known type, empty for unknown', () => {
+    expect(scriptTypeGuide('PRODUCT_OFFER')).toContain('Продукт/понуда');
+    expect(scriptTypeGuide('EDUCATIONAL')).toContain('Едукативно');
+    expect(scriptTypeGuide('TESTIMONIAL')).toContain('Тестимонијал');
+    expect(scriptTypeGuide('SKETCH')).toContain('Скеч');
+    expect(scriptTypeGuide('WHATEVER')).toBe('');
+  });
+});
+
 describe('buildWriterPrompt', () => {
   it('injects local-audience framing on a fresh script (F2)', () => {
     expect(buildWriterPrompt(writerBase)).toContain('АУДИТОРИУМ — пишуваш за МАКЕДОНСКИ гледач');
@@ -139,6 +150,20 @@ describe('buildWriterPrompt', () => {
     expect(p.startsWith('БРИФ ОД СЦЕНАРИСТОТ — НАЈВАЖНАТА НАСОКА')).toBe(true);
     expect(p).toContain('сезонска акција, потоплен тон');
     expect(p.indexOf('БРИФ ОД СЦЕНАРИСТОТ')).toBeLessThan(p.indexOf('Напиши цело реел-сценарио'));
+  });
+
+  it('includes the concept reasoning (insight + why) and script type (F3+F4)', () => {
+    const p = buildWriterPrompt({ ...writerBase, insight: 'се препознаваат во проблемот', why: 'кратко и конкретно', scriptType: 'PRODUCT_OFFER' });
+    expect(p).toContain('Тип на сценарио: Продукт/понуда —');
+    expect(p).toContain('Инсајт (зошто гледачот застанува): се препознаваат во проблемот');
+    expect(p).toContain('Зошто овој концепт работи: кратко и конкретно');
+  });
+
+  it('omits type/insight/why when absent (F3+F4)', () => {
+    const p = buildWriterPrompt(writerBase);
+    expect(p).not.toContain('Тип на сценарио:');
+    expect(p).not.toContain('Инсајт (зошто гледачот застанува)');
+    expect(p).not.toContain('Зошто овој концепт работи');
   });
 
   it('revision: short prompt referencing only the comment (no brief re-injected — session carries it)', () => {

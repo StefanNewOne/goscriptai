@@ -145,7 +145,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
   const set = concept.set;
   const client = set.client;
   const actorName = concept.actor?.name ?? 'Актер';
-  const card = concept.card as { hook: string };
+  const card = concept.card as { hook: string; insight?: string; why?: string };
 
   const routing = await getRouting('writer');
   const system = await getSystemPrompt('writer');
@@ -183,6 +183,9 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
         revision: job.revision,
         comment: job.comment,
         hook: card.hook,
+        insight: card.insight,
+        why: card.why,
+        scriptType: concept.type,
         avatar,
         product: brief.product,
         catalog,
