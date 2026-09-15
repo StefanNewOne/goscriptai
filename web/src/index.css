@@ -18,6 +18,27 @@
   }
 }
 
+/* Print → Save as PDF (Reports §7.13). Only the .print-area shows; app chrome
+   (nav, top bar) and any .no-print control is hidden, on white A4. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* prefers-reduced-motion disables all animation (README §Motion). */
 @media (prefers-reduced-motion: reduce) {
   *,

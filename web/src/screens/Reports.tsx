@@ -27,11 +27,19 @@ export function Reports() {
   const clients = useQuery({ queryKey: ['report-clients'], queryFn: () => api.get<ClientRow[]>('/reports/clients'), enabled: tab === 'clients' });
 
   return (
-    <div>
-      <h1 className="mb-4 text-28 font-semibold">{mk.nav.reports}</h1>
+    <div className="print-area">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-28 font-semibold">{mk.nav.reports}</h1>
+        <button
+          className="no-print h-9 rounded-control border border-rule px-4 text-14 hover:bg-nav-hover"
+          onClick={() => window.print()}
+        >
+          Печати / Зачувај PDF
+        </button>
+      </div>
       <div className="mb-6 flex gap-6 border-b border-rule">
         {(['monthly', 'clients'] as const).map((t) => (
-          <button key={t} className={`-mb-px border-b-2 px-1 pb-2 text-14 ${tab === t ? 'border-ink font-semibold' : 'border-transparent text-ink-2'}`} onClick={() => setTab(t)}>
+          <button key={t} className={`no-print -mb-px border-b-2 px-1 pb-2 text-14 ${tab === t ? 'border-ink font-semibold' : 'border-transparent text-ink-2'}`} onClick={() => setTab(t)}>
             {t === 'monthly' ? 'Месечно' : 'По клиент'}
           </button>
         ))}
