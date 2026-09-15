@@ -2,13 +2,18 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { DiffView } from '../components/DiffView';
 
 interface Template {
   id: string;
   kind: string;
   version: number;
   content: string;
+  active?: boolean;
+  createdAt?: string;
 }
+
+const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB').replace(/\//g, '.') : '');
 
 interface RubricCriterion { key: string; label: string; min: number }
 interface RubricConfig { criteria: RubricCriterion[]; minTotalRatio: number }
@@ -53,9 +58,18 @@ export function Settings() {
   const current = templates?.find((t) => t.kind === selected);
   const content = draft ?? current?.content ?? '';
 
+  // Version history for the selected kind (for the diff view).
+  const [compareId, setCompareId] = useState<string | null>(null);
+  const { data: versions } = useQuery({
+    queryKey: ['template-versions', selected],
+    queryFn: () => api.get<Template[]>(`/settings/templates/${selected}/versions`),
+    enabled: user?.role === 'ADMIN',
+  });
+  const compareTo = versions?.find((v) => v.id === compareId);
+
   const save = useMutation({
     mutationFn: () => api.post(`/settings/templates/${selected}`, { content }),
-    onSuccess: () => { setDraft(null); qc.invalidateQueries({ queryKey: ['templates'] }); },
+    onSuccess: () => { setDraft(null); qc.invalidateQueries({ queryKey: ['templates'] }); qc.invalidateQueries({ queryKey: ['template-versions', selected] }); },
   });
 
   // Model routing is editable (backend reads it at runtime via getRouting). Edits
@@ -105,7 +119,7 @@ export function Settings() {
       <div className="grid grid-cols-[200px_1fr] gap-6">
         <nav className="flex flex-col gap-0.5">
           {Object.keys(KIND_LABEL).map((k) => (
-            <button key={k} className={`rounded-control px-2 py-2 text-left text-14 ${k === selected ? 'bg-nav-active font-semibold' : 'hover:bg-nav-hover'}`} onClick={() => { setSelected(k); setDraft(null); }}>
+            <button key={k} className={`rounded-control px-2 py-2 text-left text-14 ${k === selected ? 'bg-nav-active font-semibold' : 'hover:bg-nav-hover'}`} onClick={() => { setSelected(k); setDraft(null); setCompareId(null); }}>
               {KIND_LABEL[k]}
             </button>
           ))}
@@ -121,6 +135,30 @@ export function Settings() {
               Зачувај верзија {(current?.version ?? 0) + 1}
             </button>
           </div>
+
+          {!!versions && versions.length > 1 && (
+            <div className="mt-6">
+              <h3 className="mb-2 text-14 font-medium">Историја на верзии</h3>
+              <div className="flex flex-wrap gap-2">
+                {versions.map((v) => (
+                  <button
+                    key={v.id}
+                    className={`rounded-control border px-2 py-1 text-13 ${compareId === v.id ? 'border-ink' : 'border-rule hover:bg-nav-hover'} ${v.active ? 'font-semibold' : 'text-ink-2'}`}
+                    onClick={() => setCompareId(compareId === v.id ? null : v.id)}
+                    title={fmtDate(v.createdAt)}
+                  >
+                    в{v.version}{v.active ? ' • активна' : ''}
+                  </button>
+                ))}
+              </div>
+              {compareTo && (
+                <div className="mt-3">
+                  <p className="mb-2 text-13 text-ink-2">Промени од в{compareTo.version} ({fmtDate(compareTo.createdAt)}) до тековната содржина:</p>
+                  <DiffView before={compareTo.content} after={content} />
+                </div>
+              )}
+            </div>
+          )}
 
           <h2 className="mb-3 mt-8 text-16 font-semibold">Модели и буџети</h2>
           <div className="overflow-hidden rounded-sheet border border-rule bg-sheet">

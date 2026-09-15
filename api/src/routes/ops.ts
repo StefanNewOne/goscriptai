@@ -30,6 +30,12 @@ export async function opsRoutes(app: FastifyInstance) {
     return { data: await prisma.template.findMany({ where: { active: true }, orderBy: [{ kind: 'asc' }, { version: 'desc' }] }) };
   });
 
+  // Full version history for a kind (newest first) — for the diff view.
+  app.get('/settings/templates/:kind/versions', { preHandler: [app.requireRole('ADMIN')] }, async (req) => {
+    const { kind } = z.object({ kind: z.string() }).parse(req.params);
+    return { data: await prisma.template.findMany({ where: { kind, language: null }, orderBy: { version: 'desc' } }) };
+  });
+
   app.post('/settings/templates/:kind', { preHandler: [app.requireRole('ADMIN')] }, async (req) => {
     const { kind } = z.object({ kind: z.string() }).parse(req.params);
     const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
