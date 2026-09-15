@@ -8,6 +8,7 @@ import { buildCode, nextSequence } from '../../domain/code.js';
 import { renderScriptMarkdown, type ScriptContent } from '../../domain/scriptFormat.js';
 import { evaluateCritic, nextCriticOutcome, type CriterionScores } from '../../domain/critic.js';
 import { moveSet, maybeReviewSet, enforceBudget } from '../../services/setService.js';
+import { buildCreativeDirectorPrompt, buildWriterPrompt, buildCriticPrompt, scriptSkeleton } from '../../agents/prompts.js';
 import { listHooks } from '../../services/mineService.js';
 import { notify } from '../../services/notificationService.js';
 import { publish } from '../../events/bus.js';
@@ -45,41 +46,6 @@ async function loadCatalog(clientId: string) {
     take: 12,
   });
   return products.map((p) => `${p.name}${p.category ? ` (${p.category})` : ''}: ${p.usp ?? '—'}`);
-}
-
-// One-line buyer summary from an avatar profile — grounds concepts/scripts in the
-// buyer (pain/desire/speech) instead of the old scripts.
-function avatarBrief(a: { profile?: unknown }): string {
-  const p = (a.profile ?? {}) as { pain?: string; desire?: string; whyBuy?: string; speech?: string };
-  return [
-    p.pain && `болка: ${p.pain}`,
-    p.desire && `сака: ${p.desire}`,
-    p.whyBuy && `купува зашто: ${p.whyBuy}`,
-    p.speech && `говор: ${p.speech}`,
-  ]
-    .filter(Boolean)
-    .join('; ');
-}
-
-// A structural SKELETON of a star script: the beat map (role, how many lines,
-// roughly how many words, structural features) with ZERO real sentences. This
-// teaches the client's reel rhythm without leaking any text to copy.
-function scriptSkeleton(content: unknown): string {
-  const frames = ((content as { frames?: SkeletonFrame[] } | null)?.frames ?? []) as SkeletonFrame[];
-  const lines = frames.map((f) => {
-    const ls = f.lines ?? [];
-    const words = ls.reduce((n, l) => n + String(l.text ?? '').trim().split(/\s+/).filter(Boolean).length, 0);
-    const extras = [f.editing ? 'монтажа' : null, f.table ? 'табела-цени' : null, f.subLabel ? 'текст-на-екран' : null].filter(Boolean).join(', ');
-    return `${f.role} — ${ls.length} реплик${ls.length === 1 ? 'а' : 'и'} (~${words} збора)${extras ? ` [${extras}]` : ''}`;
-  });
-  return lines.join('\n');
-}
-interface SkeletonFrame {
-  role?: string;
-  editing?: string;
-  subLabel?: string;
-  table?: unknown;
-  lines?: { text?: string }[];
 }
 
 // The client's VOICE as a compact CARD + a few structural SKELETONS — never raw
@@ -135,17 +101,23 @@ async function creativeDirector(setId: string) {
       const { banned, preferred } = await loadGlossary(set.clientId);
       const voice = await loadVoice(set.clientId);
       const insp = await loadInspiration(set.clientId);
-      const toneBlock = voice.voiceCard ? `\n\nГЛАС (насока за ДУХ — не реченици за копирање):\n${voice.voiceCard}` : '';
-      const hooksBlock = insp.hooks.length
-        ? `\n\nПРОВЕРЕНИ ХУКОВИ (само инспирација за стил — НЕ копирај и НЕ парафразирај; секој концепт со свеж агол):\n${insp.hooks.map((h) => `• ${h.text || h.direction}`).join('\n')}`
-        : '';
-      const insightBlock = insp.insights.length
-        ? `\n\nИНСАЈТИ (што пали — искористи ги):\n${insp.insights.map((i) => `• ${i.text}`).join('\n')}`
-        : '';
-      const dnc = insp.doNotCopy.map((r) => r.analysis || r.url).filter((s): s is string => !!s);
-      const dncBlock = dnc.length ? `\n\nНЕ ПРАВИ ВАКА (DO_NOT_COPY):\n${dnc.map((s) => `• ${s}`).join('\n')}` : '';
-      const ctx = `Клиент: ${set.client.name} (јазик ${set.client.language}). Барани сценарија: ${set.requested} (генерирај ${set.requested * 2} концепти).\nПродукт во фокус: ${brief.product ?? '—'}\nАватари (користи го ТОЧНИОТ id):\n${avatars.map((a) => `- ${a.id} · ${a.name}${avatarBrief(a) ? ` — ${avatarBrief(a)}` : ''}`).join('\n')}\nАктери (id·име·јазици): ${actors.map((a) => `${a.id}·${a.name}·${a.languages.join('/')}`).join(', ')}\nЛокации (id·име): ${locations.map((l) => `${l.id}·${l.name}`).join(', ')}\nРечник (имиња на продукти точно; други термини природно, без набивање): ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${banned.join('; ') || '—'}${toneBlock}${hooksBlock}${insightBlock}${dncBlock}`;
-      const res = await runQuery({ systemPrompt: system, prompt: `${ctx}\nСЕКОЈ концепт со РАЗЛИЧЕН агол и свеж хук — не повторувај ги истите потписни фрази од сет до сет.\nВрати ги концептите во бараниот JSON облик. Користи ги ТОЧНИТЕ id вредности за avatarId/actorId/locationId.`, model: routing.model, schema: conceptsSchema });
+      const doNotCopy = insp.doNotCopy.map((r) => r.analysis || r.url).filter((s): s is string => !!s);
+      const prompt = buildCreativeDirectorPrompt({
+        clientName: set.client.name,
+        language: set.client.language,
+        requested: set.requested,
+        product: brief.product,
+        avatars,
+        actors,
+        locations,
+        preferred,
+        banned,
+        voiceCard: voice.voiceCard,
+        hooks: insp.hooks,
+        insights: insp.insights,
+        doNotCopy,
+      });
+      const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: conceptsSchema });
       concepts = parseAgentJson<{ concepts: StubConcept[] }>(res).concepts;
       costUsd = res.costUsd;
     }
@@ -201,22 +173,25 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
       const catalog = await loadCatalog(set.clientId);
       const actor = concept.actor;
       const avatar = concept.avatarId ? await prisma.avatar.findUnique({ where: { id: concept.avatarId } }) : null;
-      const avatarBlock = avatar && avatarBrief(avatar) ? `\nКупувач (аватар „${avatar.name}“) — пиши за НЕГО: ${avatarBrief(avatar)}` : '';
       // Resume the session for THIS concept (invariant 4) — not just any writer
       // run on the set, or parallel writers would resume each other's context.
       const priorRun = job.revision ? await prisma.agentRun.findFirst({ where: { setId: set.id, conceptId: concept.id, agentKind: 'writer', sessionId: { not: null } }, orderBy: { createdAt: 'desc' } }) : null;
-      const catalogBlock = catalog.length
-        ? `\nКАТАЛОГ (суштина за СУПСТАНЦА на сценариото; цената е по сет, не од тука; не измислувај факти):\n${catalog.map((c) => `• ${c}`).join('\n')}`
-        : '';
-      const toneBlock = voice.voiceCard
-        ? `\nГЛАС (задржи го ДУХОТ; потписните фрази во наводници се потпис — најмногу ЕДНАШ, не во секое сценарио):\n${voice.voiceCard}`
-        : '';
-      const exampleBlock = voice.skeletons.length
-        ? `\nТИПИЧНИ ФОРМИ НА КЛИЕНТОТ (само ритам/должини на бит-ови — БЕЗ текст; варирај во рамки, не следи ропски):\n${voice.skeletons.map((sk, i) => `Форма ${i + 1}:\n${sk}`).join('\n\n')}`
-        : '';
-      const prompt = job.revision
-        ? `Ревидирај го сценариото според коментарот: „${job.comment ?? ''}“. Задржи го форматот §11.`
-        : `Напиши цело реел-сценарио на јазик ${client.language} во стандардниот формат (кадри со улога ХООК/БОДИ/ЦТА, режија одвоена од реплика, реплика со име на актер).\nДодај и: 3 ХУК-ВАРИЈАНТИ (различни отворачки за истиот концепт), 3 CAPTION варијанти (текст за објавата), продукциска забелешка (како да се снима — тон, кадри, што да се потврди пред снимање), формат (пр. „Presenter + demo“), вајб, музика, платформи, времетраење во секунди.\nКонцепт (hook): „${card.hook}“${avatarBlock}\nПродукт во фокус: ${brief.product ?? '—'}${catalogBlock}\nАктер: ${actorName}${actor?.style ? ` — стил: ${actor.style}` : ''}${actor?.cannotDo?.length ? ` — НЕ МОЖЕ: ${actor.cannotDo.join(', ')}` : ''}\nРечник (користи природно, не набивај): ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (не користи): ${banned.join('; ') || '—'}${toneBlock}${exampleBlock}\nВАЖНО: пиши СВЕЖИ, разговорни реплики — не рециклирај реченици/слогани од постоечки видеа, веб-текст или профилот, не врти ги истите фрази. Природно, како што зборува човек, не како реклама-клише.\nВрати го во бараниот JSON облик.`;
+      const prompt = buildWriterPrompt({
+        language: client.language,
+        revision: job.revision,
+        comment: job.comment,
+        hook: card.hook,
+        avatar,
+        product: brief.product,
+        catalog,
+        actorName,
+        actorStyle: actor?.style ?? null,
+        actorCannotDo: actor?.cannotDo,
+        preferred,
+        banned,
+        voiceCard: voice.voiceCard,
+        skeletons: voice.skeletons,
+      });
       const res = await runQuery({ systemPrompt: system, prompt, model: routing.model, schema: scriptSchema, sessionId: priorRun?.sessionId ?? undefined });
       drafted = parseAgentJson<typeof drafted>(res);
       writerSession = res.sessionId;
@@ -299,7 +274,7 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
       const catalog = await loadCatalog(script.clientId);
       const res = await runQuery({
         systemPrompt: system,
-        prompt: `Оцени го сценариото по 11-те критериуми (1–5) и дај наоди со референца на кадар. Јазик: ${script.language}.\nПретпочитани термини/имиња на продукти: ${preferred.join('; ') || '—'}\nЗАБРАНЕТИ фрази (сценариото НЕ смее да ги содржи): ${banned.join('; ') || '—'}\nКАТАЛОГ (за критериумот „точност" — фактите мора да се совпаѓаат; цена е по сет):\n${catalog.map((c) => `• ${c}`).join('\n') || '—'}\nОРИГИНАЛНОСТ (во критериумот „антиГенеричност"): КАЗНИ рециклирани/клише реплики, реклама-калап и повторени потписни слогани; НАГРАДИ свежи, разговорни, човечки реченици. Ако звучи препишано од веб/стари видеа — ниска оценка + конкретен наод.\nСценарио (markdown):\n${script.markdown}\nВрати ги оценките и наодите во бараниот JSON облик.`,
+        prompt: buildCriticPrompt({ language: script.language, preferred, banned, catalog, markdown: script.markdown }),
         model: routing.model,
         schema: criticSchema,
       });
