@@ -103,6 +103,19 @@ async function run() {
     check('viewer POST set → 403', (await req('POST', '/sets', viewerToken, { clientId: 'x', requested: 1 })).status === 403);
     check('scriptwriter raise-budget (admin-only) → 403', (await req('POST', '/sets/x/raise-budget', writerToken, { budgetUsd: 10 })).status === 403);
 
+    // ── B2. User administration (Admin only) ────────────────────────
+    check('viewer GET /users → 403', (await req('GET', '/users', viewerToken)).status === 403);
+    check('writer POST /users → 403', (await req('POST', '/users', writerToken, { name: 'X', email: 'x@y.mk', role: 'VIEWER', password: 'secret6' })).status === 403);
+    const usersList = await req('GET', '/users', adminToken);
+    check('admin GET /users → 200, no passwordHash', usersList.status === 200 && !JSON.stringify(usersList.json).includes('passwordHash'));
+    const newU = await req('POST', '/users', adminToken, { name: 'Тест Корисник', email: `itest_user_${Date.now()}@x.mk`, role: 'SCRIPTWRITER', password: 'secret6' });
+    check('admin create user → 201, no passwordHash', newU.status === 201 && newU.json?.data?.role === 'SCRIPTWRITER' && newU.json?.data?.passwordHash === undefined);
+    check('duplicate email → 400', (await req('POST', '/users', adminToken, { name: 'Y', email: newU.json?.data?.email, role: 'VIEWER', password: 'secret6' })).status === 400);
+    check('change user role → 200', (await req('PATCH', `/users/${newU.json?.data?.id}/role`, adminToken, { role: 'ADMIN' })).status === 200);
+    const meAdmin = await req('GET', '/auth/me', adminToken);
+    check('admin cannot change own role (self-lockout) → 400', (await req('PATCH', `/users/${meAdmin.json.data.user.id}/role`, adminToken, { role: 'VIEWER' })).status === 400);
+    check('reset password too short → 400', (await req('POST', `/users/${newU.json?.data?.id}/reset-password`, adminToken, { password: '123' })).status === 400);
+
     // ── C. Input validation ─────────────────────────────────────────
     console.log('\nC. Input validation');
     check('create client missing name → 400', (await req('POST', '/clients', adminToken, { language: 'MK' })).status === 400);

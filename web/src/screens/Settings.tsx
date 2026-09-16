@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { DiffView } from '../components/DiffView';
+import { UsersSection } from '../components/UsersSection';
 
 interface Template {
   id: string;
@@ -204,6 +205,8 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      {user && <UsersSection currentUserId={user.id} />}
     </div>
   );
 }
