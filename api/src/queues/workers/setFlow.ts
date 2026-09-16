@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
-import { getRouting, getSystemPrompt, getCriticRubric } from '../../agents/registry.js';
+import { getRouting, getSystemPrompt, getCriticRubric, getGlobalBanned } from '../../agents/registry.js';
 import { isStubMode, runQuery, parseAgentJson } from '../../agents/sdk.js';
 import { conceptsSchema, scriptSchema, criticSchema } from '../../agents/schemas.js';
 import { stubConcepts, stubScript, stubCritic, type StubConcept } from '../../agents/setStubs.js';
@@ -44,11 +44,13 @@ export async function runSetJob(job: SetJob): Promise<void> {
 // Load the client's language + glossary (preferred/banned) for any text-writing
 // agent — required input by invariant 8. Only confirmed terms are used so an
 // unconfirmed proposal never steers generation.
-async function loadGlossary(clientId: string) {
+async function loadGlossary(clientId: string, language: string) {
   const glossary = await prisma.glossaryTerm.findMany({ where: { clientId, confirmed: true } });
   const banned = glossary.filter((g) => g.kind === 'BANNED').map((g) => g.term);
   const preferred = glossary.filter((g) => g.kind !== 'BANNED').map((g) => `${g.term} (${g.meaning})`);
-  return { banned, preferred };
+  // Merge the agency-wide banned list (Settings) on top of the client's own.
+  const global = await getGlobalBanned(language);
+  return { banned: [...new Set([...banned, ...global])], preferred };
 }
 
 // Confirmed catalog ESSENCE — the substance the Writer builds real content from,
@@ -114,7 +116,7 @@ async function creativeDirector(setId: string) {
     if (isStubMode()) {
       concepts = stubConcepts({ requested: set.requested, clientName: set.client.name, avatarIds, actorIds, locationIds, product: brief.product });
     } else {
-      const { banned, preferred } = await loadGlossary(set.clientId);
+      const { banned, preferred } = await loadGlossary(set.clientId, set.client.language);
       const voice = await loadVoice(set.clientId);
       const insp = await loadInspiration(set.clientId);
       const doNotCopy = insp.doNotCopy.map((r) => r.analysis || r.url).filter((s): s is string => !!s);
@@ -201,7 +203,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
   let catalog: string[] = [];
   let avatar: { name?: string; profile?: unknown } | null = null;
   if (!stub) {
-    ({ banned, preferred } = await loadGlossary(set.clientId));
+    ({ banned, preferred } = await loadGlossary(set.clientId, client.language));
     const voice = await loadVoice(set.clientId);
     voiceCard = voice.voiceCard;
     skeletons = voice.skeletons;
@@ -355,7 +357,7 @@ async function critic(job: Extract<SetJob, { kind: 'critic' }>) {
     if (isStubMode()) {
       ({ scores, findings } = stubCritic());
     } else {
-      const { banned, preferred } = await loadGlossary(script.clientId);
+      const { banned, preferred } = await loadGlossary(script.clientId, script.language);
       const catalog = await loadCatalog(script.clientId);
       // The intent behind the script (F6): its concept (buyer + angle) and the
       // set brief — so avatar/hook/structure criteria are judged against intent.

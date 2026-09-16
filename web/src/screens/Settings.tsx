@@ -53,6 +53,7 @@ export function Settings() {
   const { data: templates } = useQuery({ queryKey: ['templates'], queryFn: () => api.get<Template[]>('/settings/templates'), enabled: user?.role === 'ADMIN' });
   const { data: routing } = useQuery({ queryKey: ['routing'], queryFn: () => api.get<Record<string, { model: string; fallback: string; budgetUsd: number }>>('/settings/model_routing'), enabled: user?.role === 'ADMIN' });
   const { data: rubricRaw } = useQuery({ queryKey: ['rubric'], queryFn: () => api.get<RubricConfig | RubricCriterion[] | null>('/settings/critic_rubric'), enabled: user?.role === 'ADMIN' });
+  const { data: bannedRaw } = useQuery({ queryKey: ['banned'], queryFn: () => api.get<{ MK?: string[]; SQ?: string[] } | null>('/settings/banned_phrases'), enabled: user?.role === 'ADMIN' });
 
   const [selected, setSelected] = useState<string>('creative_director');
   const [draft, setDraft] = useState<string | null>(null);
@@ -108,6 +109,21 @@ export function Settings() {
   const saveRubric = useMutation({
     mutationFn: () => api.put('/settings/critic_rubric', { value: rubricView }),
     onSuccess: () => { setRubricDraft(null); qc.invalidateQueries({ queryKey: ['rubric'] }); },
+  });
+
+  // Global banned phrases (agency-wide, per language) — merged into every
+  // client's banned list at generation. Edited as one phrase per line.
+  const bannedServer = { MK: bannedRaw?.MK ?? [], SQ: bannedRaw?.SQ ?? [] };
+  const [bannedDraft, setBannedDraft] = useState<{ MK: string; SQ: string } | null>(null);
+  const bannedText = bannedDraft ?? { MK: bannedServer.MK.join('\n'), SQ: bannedServer.SQ.join('\n') };
+  const parseLines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
+  const bannedDirty =
+    bannedDraft !== null &&
+    (JSON.stringify(parseLines(bannedText.MK)) !== JSON.stringify(bannedServer.MK) ||
+      JSON.stringify(parseLines(bannedText.SQ)) !== JSON.stringify(bannedServer.SQ));
+  const saveBanned = useMutation({
+    mutationFn: () => api.put('/settings/banned_phrases', { value: { MK: parseLines(bannedText.MK), SQ: parseLines(bannedText.SQ) } }),
+    onSuccess: () => { setBannedDraft(null); qc.invalidateQueries({ queryKey: ['banned'] }); },
   });
 
   if (user?.role !== 'ADMIN') {
@@ -201,6 +217,24 @@ export function Settings() {
           <div className="mt-3">
             <button className="h-10 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50" onClick={() => saveRubric.mutate()} disabled={!rubricDirty || saveRubric.isPending}>
               Зачувај рубрика
+            </button>
+          </div>
+
+          <h2 className="mb-1 mt-8 text-16 font-semibold">Забранети фрази (глобално)</h2>
+          <p className="mb-3 text-13 text-ink-2">Една по ред. Важат за сите клиенти по јазик, врз речникот на клиентот; писателот и критичарот ги добиваат.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="mb-1 text-13 text-ink-2">Македонски</div>
+              <textarea className="w-full rounded-sheet border border-rule bg-sheet p-2 font-mono text-13" rows={5} value={bannedText.MK} onChange={(e) => setBannedDraft({ ...bannedText, MK: e.target.value })} />
+            </div>
+            <div>
+              <div className="mb-1 text-13 text-ink-2">Албански</div>
+              <textarea className="w-full rounded-sheet border border-rule bg-sheet p-2 font-mono text-13" rows={5} value={bannedText.SQ} onChange={(e) => setBannedDraft({ ...bannedText, SQ: e.target.value })} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <button className="h-10 rounded-control bg-ink px-4 text-14 font-medium text-white hover:bg-ink-btn-hover disabled:opacity-50" onClick={() => saveBanned.mutate()} disabled={!bannedDirty || saveBanned.isPending}>
+              Зачувај забранети фрази
             </button>
           </div>
         </div>

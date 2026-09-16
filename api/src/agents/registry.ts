@@ -59,3 +59,13 @@ export async function getCriticRubric(): Promise<CriticRubricConfig> {
   const minTotalRatio = obj && typeof obj.minTotalRatio === 'number' ? obj.minTotalRatio : MIN_TOTAL_RATIO;
   return { minPerCriterion: MIN_PER_CRITERION, minTotalRatio, perCriterionMin };
 }
+
+// Agency-wide banned phrases from Settings (banned_phrases: { MK:[], SQ:[] }) —
+// a global guardrail merged on top of each client's per-client glossary. For a
+// BOTH client, both languages' lists apply.
+export async function getGlobalBanned(language: string): Promise<string[]> {
+  const setting = await prisma.setting.findUnique({ where: { key: 'banned_phrases' } });
+  const value = (setting?.value ?? {}) as Record<string, unknown>;
+  const pick = (k: string) => (Array.isArray(value[k]) ? (value[k] as unknown[]).filter((x): x is string => typeof x === 'string') : []);
+  return language === 'BOTH' ? [...pick('MK'), ...pick('SQ')] : pick(language);
+}
