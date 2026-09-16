@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { searchScripts, getScript, toggleStar } from '../services/scriptService.js';
+import { searchScripts, getScript, toggleStar, backfillEmbeddings } from '../services/scriptService.js';
 import { monthlyReport, clientReport } from '../services/reportService.js';
 
 // Script database + reports (read-mostly dashboard screens).
@@ -29,6 +29,11 @@ export async function catalogRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: z.string() }).parse(req.params);
     const { star } = z.object({ star: z.boolean() }).parse(req.body);
     return { data: await toggleStar(id, star) };
+  });
+
+  // Backfill semantic embeddings for scripts missing one (no-op without Voyage).
+  app.post('/scripts/reindex', { preHandler: [app.requireRole('ADMIN')] }, async () => {
+    return { data: await backfillEmbeddings() };
   });
 
   app.get('/reports/monthly', async () => ({ data: await monthlyReport() }));

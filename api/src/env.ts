@@ -17,6 +17,11 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MAX_RETRIES: z.coerce.number().int().min(0).default(0),
 
+  // Voyage AI embeddings for semantic script search (optional — text search is
+  // the fallback when unset). Model is multilingual for MK/SQ; 1024-dim.
+  VOYAGE_API_KEY: z.string().optional(),
+  VOYAGE_MODEL: z.string().default('voyage-3.5'),
+
   SES_REGION: z.string().optional(),
   SES_ACCESS_KEY_ID: z.string().optional(),
   SES_SECRET_ACCESS_KEY: z.string().optional(),

@@ -3,6 +3,7 @@ import { AppError } from '../lib/errors.js';
 import { parseScriptText, parseRichScript } from '../import/parser.js';
 import { buildCode, nextSequence, yymmFromDate } from '../domain/code.js';
 import { renderScriptMarkdown, type ScriptContent } from '../domain/scriptFormat.js';
+import { indexScript } from './scriptService.js';
 import type { ScriptType } from '../domain/types.js';
 
 export function parse(text: string) {
@@ -70,7 +71,7 @@ export async function commit(input: CommitInput) {
     input.content,
   );
 
-  return prisma.script.create({
+  const script = await prisma.script.create({
     data: {
       clientId: input.clientId,
       code,
@@ -88,6 +89,8 @@ export async function commit(input: CommitInput) {
       ...rich,
     },
   });
+  void indexScript(script.id).catch(() => {}); // semantic index, fire-and-forget
+  return script;
 }
 
 // Parse a delivered scenario document (text) into a rich commit input. Used by

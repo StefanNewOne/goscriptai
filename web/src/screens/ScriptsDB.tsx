@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { ScriptView, type ScriptContent } from '../components/ScriptView';
 import { mk } from '../i18n/mk';
 
@@ -29,6 +30,7 @@ const TYPE_CHIPS = [
 // shares the same input) + type/star chips, opens the read-only ScriptView.
 export function ScriptsDB() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [star, setStar] = useState(false);
@@ -43,6 +45,9 @@ export function ScriptsDB() {
     mutationFn: (v: { id: string; star: boolean }) => api.post(`/scripts/${v.id}/star`, { star: v.star }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['scripts'] }),
   });
+
+  // Admin: backfill semantic embeddings (no-op server-side without a Voyage key).
+  const reindex = useMutation({ mutationFn: () => api.post<{ indexed: number; total: number }>('/scripts/reindex') });
 
   const open = data?.find((s) => s.id === openId);
 
@@ -62,6 +67,16 @@ export function ScriptsDB() {
         <button className={`h-8 rounded-pill px-3 text-13 ${star ? 'bg-ink text-white' : 'border border-rule hover:bg-row-hover'}`} onClick={() => setStar((v) => !v)}>
           ★ Ѕвезди
         </button>
+        {user?.role === 'ADMIN' && (
+          <button
+            className="ml-auto h-8 rounded-control border border-rule px-3 text-13 hover:bg-row-hover disabled:opacity-50"
+            onClick={() => reindex.mutate()}
+            disabled={reindex.isPending}
+            title="Изгради семантички индекс за сценарија без индекс"
+          >
+            {reindex.isPending ? 'Индексирам…' : reindex.data ? `Индексирани ${reindex.data.indexed}/${reindex.data.total}` : 'Индексирај'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-[1fr_minmax(0,1.4fr)] gap-6">

@@ -275,7 +275,7 @@ model TrendReference {
   analysis   String?
   flag       String // INSPIRATION | DO_NOT_COPY
   source     String // link | whisper | paste
-  embedding  Unsupported("vector(1536)")?
+  embedding  Unsupported("vector(1024)")?
   createdAt  DateTime                      @default(now())
 
   @@index([clientId])
@@ -403,7 +403,7 @@ model Script {
   hookVariants   String[]                     @default([])
   captions       String[]                     @default([])
   productionNote String?
-  embedding     Unsupported("vector(1536)")?
+  embedding     Unsupported("vector(1024)")?
   adCreatives   AdCreative[]
   versions      ScriptVersion[]
   mediaAsset    MediaAsset?

@@ -8,6 +8,7 @@ import { buildCode, nextSequence } from '../../domain/code.js';
 import { renderScriptMarkdown, type ScriptContent } from '../../domain/scriptFormat.js';
 import { evaluateCritic, nextCriticOutcome, type CriterionScores } from '../../domain/critic.js';
 import { moveSet, maybeReviewSet, enforceBudget } from '../../services/setService.js';
+import { indexScript } from '../../services/scriptService.js';
 import { buildCreativeDirectorPrompt, buildWriterPrompt, buildCriticPrompt, scriptSkeleton } from '../../agents/prompts.js';
 import { listHooks } from '../../services/mineService.js';
 import { notify } from '../../services/notificationService.js';
@@ -332,6 +333,7 @@ async function writer(job: Extract<SetJob, { kind: 'writer' }>) {
       await recordCost({ runId: r.run.id, clientId: set.clientId, setId: set.id, agentKind: 'writer', model: routing.model, usd: r.costUsd, scope: 'set', scopeId: set.id });
       await finishRun(r.run.id, 'DONE', 'set', set.id, 'writer', undefined, r.session);
       r.finished = true;
+      void indexScript(r.script!.id).catch(() => {}); // semantic index, fire-and-forget
     }
     if (await enforceBudget(set.id)) return;
     for (const r of results) {

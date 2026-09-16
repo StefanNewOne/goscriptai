@@ -4,6 +4,7 @@ import { transitionSet } from '../domain/setMachine.js';
 import { evaluateBudget, canResumeAfterRaise } from '../domain/budget.js';
 import { yymmFromDate } from '../domain/code.js';
 import { renderScriptMarkdown } from '../domain/scriptFormat.js';
+import { indexScript } from './scriptService.js';
 import { publish } from '../events/bus.js';
 import { notify } from './notificationService.js';
 import { setQueue } from '../queues/index.js';
@@ -164,6 +165,7 @@ export async function editScript(scriptId: string, content: ScriptContentT, user
   );
   await saveVersion(scriptId, content as ScriptContentT, markdown, userId, 'рачна доработка');
   await prisma.script.update({ where: { id: scriptId }, data: { content: content as never, markdown, version: { increment: 1 } } });
+  void indexScript(scriptId).catch(() => {}); // re-index after a manual edit
   return { ok: true };
 }
 
